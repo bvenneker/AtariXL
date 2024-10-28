@@ -43,7 +43,6 @@ char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
 
-
 WiFiCommandMessage commandMessage;
 WiFiResponseMessage responseMessage;
 
@@ -52,8 +51,6 @@ WiFiResponseMessage responseMessage;
 // ********************************
 // see http://www.bartvenneker.nl/index.php?art=0030
 // for usable io pins!
-
-#define oBusNMI GPIO_NUM_32  // non-maskable interrupt signal to Bus
 #define CLED GPIO_NUM_4      // led on cartridge
 #define sclk1 GPIO_NUM_27    // serial clock signal to the shift register
 #define RCLK GPIO_NUM_14     // RCLK signal to the 165 shift register
@@ -185,18 +182,16 @@ void setup() {
   ssid = settings.getString("ssid", "empty");  // get WiFi credentials and Chatserver ip/fqdn from eeprom
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
-
-
   settings.end();
 
   // define inputs
   pinMode(sdata, INPUT);
-  pinMode(BusIO1, INPUT_PULLDOWN);
+  pinMode(BusIO1, INPUT_PULLUP);
   pinMode(BusIO2, INPUT_PULLUP);
   pinMode(resetSwitch, INPUT_PULLUP);
 
   // define interrupts
-  attachInterrupt(BusIO1, isr_io1, RISING);          // interrupt for io1, Bus writes data to io1 address space
+  attachInterrupt(BusIO1, isr_io1, FALLING);          // interrupt for io1, Bus writes data to io1 address space
   attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Bus reads
   attachInterrupt(resetSwitch, isr_reset, FALLING);  // interrupt for reset button
 
@@ -206,9 +201,6 @@ void setup() {
   digitalWrite(CLED, LOW);
 
   ready_to_receive(false);
-  pinMode(oBusRST, OUTPUT);
-  pinMode(oBusNMI, OUTPUT);
-
 
   pinMode(RCLK, OUTPUT);
   digitalWrite(RCLK, LOW);  // must be low  
@@ -1083,23 +1075,6 @@ void receive_buffer_from_Bus(int cnt) {
   inbuffersize = i;
   Serial.println();
 }
-
-
-
-
-
-// ******************************************************************************
-// pull the NMI line low for a few microseconds
-// ******************************************************************************
-void triggerNMI() {
-
-  // toggle NMI
-  digitalWrite(oBusNMI, !invert_nmi_signal);
-  delayMicroseconds(100);
-  // And toggle back
-  digitalWrite(oBusNMI, invert_nmi_signal);
-}
-
 
 // ******************************************************************************
 // send a single byte to the Bus
