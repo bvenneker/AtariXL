@@ -459,9 +459,6 @@ void updateProgress(int p){
   shiftOut(oSdata,sclk2,MSBFIRST,p) ; 
   digitalWrite(RCLK,HIGH);
 
-  // trigger NMI
-  digitalWrite(oBusNMI, 1);
-  delayMicroseconds(100); 
-  digitalWrite(oBusNMI, 0);
+  
 }
 

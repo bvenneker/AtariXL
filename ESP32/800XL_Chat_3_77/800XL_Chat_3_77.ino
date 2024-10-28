@@ -2,7 +2,6 @@
 // https://forums.atariage.com/topic/170304-xlxe-cold-start/#comment-2106862
 // dus jump naar: $e477? of naar het adres dat daar staat..
 
-
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include "common.h"
@@ -43,6 +42,7 @@ char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
 
+
 WiFiCommandMessage commandMessage;
 WiFiResponseMessage responseMessage;
 
@@ -51,11 +51,15 @@ WiFiResponseMessage responseMessage;
 // ********************************
 // see http://www.bartvenneker.nl/index.php?art=0030
 // for usable io pins!
-#define CLED GPIO_NUM_4      // led on cartridge
-#define sclk1 GPIO_NUM_27    // serial clock signal to the shift register
-#define RCLK GPIO_NUM_14     // RCLK signal to the 165 shift register
-#define sclk2 GPIO_NUM_25    // serial clock signal to the shift register
-#define oSdata GPIO_NUM_33
+
+#define CLED GPIO_NUM_5     // led on cartridge
+#define sclk1 GPIO_NUM_27   // serial clock signal to the shift register
+#define RCLK GPIO_NUM_14    // RCLK signal to the 165 shift register
+#define sclk2 GPIO_NUM_25   // serial clock signal to the shift register
+#define oSdata GPIO_NUM_33  // serial data to output buffer
+#define RTR GPIO_NUM_4      // Ready to receive signal
+#define RTS GPIO_NUM_26     // Ready to send signal
+
 
 // ********************************
 // **        INPUTS             **
@@ -63,20 +67,14 @@ WiFiResponseMessage responseMessage;
 #define resetSwitch GPIO_NUM_15  // this pin outputs PWM signal at boot
 #define BusIO1 GPIO_NUM_22
 #define sdata GPIO_NUM_34
-#define BusIO2 GPIO_NUM_13  
-
-//IOs for CH9350 used on ESP32
-#define RXKEY GPIO_NUM_16
-#define TXKEY GPIO_NUM_17
-
+#define BusIO2 GPIO_NUM_13
 
 // *************************************************
 // Interrupt routine for IO1
 // *************************************************
 void IRAM_ATTR isr_io1() {
 
-  // This signal goes LOW when the computer writes to (or reads from) the IO1 address space
-  // In our case the ZX Spectrum only WRITES the IO1 address space, so ESP32 can read the data.
+  // This signal goes LOW when the Atari writes to (or reads from) the $D502 address.
   ready_to_receive(false);
   ch = 0;
   ch = shiftIn(sdata, sclk1, MSBFIRST);
@@ -87,7 +85,7 @@ void IRAM_ATTR isr_io1() {
 // Interrupt routine for IO2
 // *************************************************
 void IRAM_ATTR isr_io2() {
-  // This signal goes LOW when the computer uses the output or input command in our address space
+  // This signal goes LOW when the Atari reads from address $D502
   io2 = true;
 }
 
@@ -98,13 +96,13 @@ void IRAM_ATTR isr_reset() {
   reboot();
 }
 
-void resetComputer(){
+void resetComputer() {
   // reset the computer.
   // on Atari, there is no reset pin to pull down on the cartridge port
   // instead we try a jump to the start OS vector in $E477
   sendByte(232);
-  
 }
+
 void reboot() {
   resetComputer();
   ESP.restart();
@@ -128,8 +126,6 @@ void create_Task_WifiCore() {
 // *************************************************
 void setup() {
   Serial.begin(115200);
-  Serial2.begin(115200, SERIAL_8N1, RXKEY, TXKEY);  
-  USBKeyBoard.begin(Serial2);
 
   commandBuffer = xMessageBufferCreate(sizeof(commandMessage) + sizeof(size_t));
   responseBuffer = xMessageBufferCreate(sizeof(responseMessage) + sizeof(size_t));
@@ -182,6 +178,7 @@ void setup() {
   ssid = settings.getString("ssid", "empty");  // get WiFi credentials and Chatserver ip/fqdn from eeprom
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
+
   settings.end();
 
   // define inputs
@@ -191,24 +188,31 @@ void setup() {
   pinMode(resetSwitch, INPUT_PULLUP);
 
   // define interrupts
-  attachInterrupt(BusIO1, isr_io1, FALLING);          // interrupt for io1, Bus writes data to io1 address space
-  attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Bus reads
+  attachInterrupt(BusIO1, isr_io1, FALLING);         // interrupt for io1, Atari writes data at $D502
+  attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Atari reads data at $D502
   attachInterrupt(resetSwitch, isr_reset, FALLING);  // interrupt for reset button
 
+
   // define outputs
+  pinMode(RTR, OUTPUT);
+  digitalWrite(RTR, LOW);
+  pinMode(RTS, OUTPUT);
+  digitalWrite(RTS, LOW);
+
   pinMode(oSdata, OUTPUT);
   pinMode(CLED, OUTPUT);
   digitalWrite(CLED, LOW);
-
   ready_to_receive(false);
-
+  ready_to_send(false);
   pinMode(RCLK, OUTPUT);
-  digitalWrite(RCLK, LOW);  // must be low  
+  digitalWrite(RCLK, LOW);  // must be low
   pinMode(sclk1, OUTPUT);
   digitalWrite(sclk1, LOW);  //data shifts to serial data output on the transition from low to high.
   pinMode(sclk2, OUTPUT);
   digitalWrite(sclk2, LOW);  //data shifts to serial data output on the transition from low to high.
 
+
+  //ready_to_receive(false);
   if (doReset != 157) {
     resetComputer();
 
@@ -225,6 +229,9 @@ void setup() {
   settings.begin("mysettings", false);
   settings.putInt("doReset", 0);
   settings.end();
+
+
+
 
   // load the prg file
   if (!pastMatrix) loadPrgfile();
@@ -251,7 +258,8 @@ int pos1 = 0;
 int pos0 = 0;
 bool wifiError = false;
 void loop() {
-  
+
+
   digitalWrite(CLED, isWifiCoreConnected);
   ready_to_receive(true);
 
@@ -303,7 +311,7 @@ void loop() {
     // 235 = Computer sends server configuration status
     // 234 = get user list first page
     // 233 = get user list next page
-	// 232 = Restart the computer (atari only)
+    // 232 = Restart the computer (atari only)
     // 228 = debug purposes
     // 128 = end marker, ignore
 
@@ -392,8 +400,8 @@ void loop() {
           if (b == '@') {
             toEncode = "[" + String(translateColor(int(inbuffer[0]))) + "]";
             for (int x = 2; x < 15; x++) {
-              byte b = inbuffer[x];              
-              if (b != 32 and b!=',' and b!=':' and b!=';' and b!='.') {
+              byte b = inbuffer[x];
+              if (b != 32 and b != ',' and b != ':' and b != ';' and b != '.') {
                 if (b < 127) {
                   RecipientName = (RecipientName + char(b));
                 } else {
@@ -420,9 +428,8 @@ void loop() {
           if (RecipientName != "") {
             // is this a valid username?
             String test_name = RecipientName;
-            if (test_name.endsWith(",") or test_name.endsWith(".")){
-                test_name.remove(test_name.length()-1);
-
+            if (test_name.endsWith(",") or test_name.endsWith(".")) {
+              test_name.remove(test_name.length() - 1);
             }
             test_name.toLowerCase();
 #ifdef debug
@@ -680,7 +687,7 @@ void loop() {
           String ns = bns;
           ns.replace(" ", "");
           romVersion = ns;
-          // respond with byte 128 to tell the zxspectrum the cartridge is present
+          // respond with byte 128 to tell the computer the cartridge is present
           sendByte(128);
           pastMatrix = true;
           getMessage = true;
@@ -842,7 +849,8 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 236 = Computer asks for the server configuration status and servername
           // ------------------------------------------------------------------------------
-          
+
+
 #ifdef debug
           //Serial.println("response 236 = " + configured + " " + server + " " + SwVersion);
 #endif
@@ -900,6 +908,13 @@ void loop() {
           break;
         }
       case 232:
+       {  
+          Serial.println("RESET button on Atari pressed");
+          ESP.restart();
+          //reboot();
+          break;
+        }
+      case 231:
         {  // do the update!
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
@@ -915,6 +930,7 @@ void loop() {
           }
           break;
         }
+
       case 228:
         {
           // ------------------------------------------------------------------------------
@@ -936,48 +952,10 @@ void loop() {
   }  // end of "if (dataFromBus)"
   else {
     // No data from computer bus
-
-    int key;
-    key = USBKeyBoard.GetKey();
-    if (key > 0) {
-      Serial.print(key);
-      Serial.print("=");
-      key=translateKeystrokes(key);
-      Serial.println(key);
-      int chi = Serial.read();
-      sendByte(201);       
-      delayMicroseconds(1500);       
-      outByte(key);
-      while (!io2) {}
-    } 
   }
 }  // end of main loop
 
-int translateKeystrokes(int i){
 
-  if (i == 241) return 199; // f1 = symbol shift - Q (go to main menu)
-  if (i == 179) return 195; // controll S 
-  if (i == 245) return 226; // f5 = symbol shift - A (private message)
-
-            //   0   1   2   3   4   5   6   7   8   9
-  int kkeys[]={  0,  0,  0,  0,  0,  0,  0,  0, 12,  9,  //   0 -  9
-                10, 11, 12, 13, 14,195, 11, 10,  8,  9,  //  10 - 19
-                20, 21, 22, 23, 24, 25, 26, 27, 28, 29,  //  20 - 29
-                30, 31, 32, 33, 34, 35, 36, 37, 38, 39,  //  30 - 39
-                40, 41, 42, 43, 44, 45, 46, 47, 48, 49,  //  40 - 49
-                50, 51, 52, 53, 54, 55, 56, 57, 58, 59,  //  50 - 59
-                60, 61, 62, 63, 64, 65, 66, 67, 68, 69,  //  60 - 69
-                70, 71, 72, 73, 74, 75, 76, 77, 78, 79,  //  70 - 79
-                80, 81, 82, 83, 84, 85, 86, 87, 88, 89,  //  80 - 89
-                90, 91, 92, 93, 94, 95, 96, 97, 98, 99,  //  90 - 99
-               100,101,102,103,104,105,106,107,108,109,  // 100 - 109
-               110,111,112,113,114,115,116,117,118,119,  // 110 - 119
-               120,121,122,123,124,125,126, 12,128,129   // 120 - 129
-              };
-
-  if (i>129) return i;
-  return kkeys[i];
-}
 // ******************************************************************************
 // void to set a byte in the 74ls595 shift register
 // ******************************************************************************
@@ -1076,14 +1054,27 @@ void receive_buffer_from_Bus(int cnt) {
   Serial.println();
 }
 
+
 // ******************************************************************************
 // send a single byte to the Bus
 // ******************************************************************************
 void sendByte(byte b) {
-
-// atari version
-
+  outByte(b);
+  io2 = false;
+  ready_to_send(true);
+  // wait for io2 interupt
+  unsigned long timeOut = millis() + 300;
+  while (io2 == false) {
+    delayMicroseconds(2);
+    if (millis() > timeOut) {
+      io2 = true;
+      Serial.println("Timeout in sendByte");
+    }
+  }
+  ready_to_send(false);
+  io2 = false;
 }
+
 
 // ******************************************************************************
 // Deserialize the json encoded messages
@@ -1164,25 +1155,25 @@ void doUrgentMessage() {
 }
 
 void loadPrgfile() {
-  int delayTime = 50;
-  delay(2000);  // give the computer some time to boot
+  int delayTime = 150;
+  //delay(2000);  // give the computer some time to boot
+  ch = 0;
+  ready_to_receive(true);
   Serial.println("Waiting for start signal");
   int i = 0;
   while (ch != 100) {  // wait for the computer to send byte 100
-    delay(10);
-    if (i++ > 200) ESP.restart();
+    ready_to_receive(true);
   }
 
-  delay(10);
+
   Serial.println("------ LOAD PRG FILE ------");
-  sendByte(5);  // first send the border color
 
   delayMicroseconds(delayTime);
-  sendByte(lowByte(sizeof(prgfile)));
+  sendByte(lowByte(sizeof(prgfile) - 6));
   delayMicroseconds(delayTime);
-  sendByte(highByte(sizeof(prgfile)));
+  sendByte(highByte(sizeof(prgfile) - 6));
 
-  for (int x = 0; x < sizeof(prgfile); x++) {  // Now send all the rest of the bytes
+  for (int x = 6; x < sizeof(prgfile); x++) {  // Now send all the rest of the bytes
     delayMicroseconds(delayTime);
     sendByte(prgfile[x]);
   }
@@ -1200,7 +1191,7 @@ void translateZXMessage() {
   int sp = 20 - msgbuffer[0];
   int b = 0;
   int y = 0;
-  int zxColors[] = { 7, 7, 2, 5, 3, 4, 1, 6, 2, 2, 2, 7, 7, 4, 1, 7 };
+  int zxColors[] = { 7, 7, 2, 5, 3, 4, 7, 6, 2, 2, 2, 7, 7, 4, 7, 7 };
 
   // start with number of lines
   outbuffer[0] = msgbuffer[0];
@@ -1284,12 +1275,19 @@ int translateColor(int color) {
 
 void ready_to_receive(bool b) {
   if (b)
-    outByte(128);
+    digitalWrite(RTR, HIGH);
   else
-    outByte(0);
+    digitalWrite(RTR, LOW);
   return;
 }
 
+void ready_to_send(bool b) {
+  if (b)
+    digitalWrite(RTS, HIGH);
+  else
+    digitalWrite(RTS, LOW);
+  return;
+}
 
 uint8_t myShiftIn(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrder) {
   uint8_t value = 0;
