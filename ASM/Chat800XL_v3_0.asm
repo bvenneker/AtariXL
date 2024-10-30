@@ -188,6 +188,8 @@ cp_3
   jmp main_menu_key_input
   
 exit_main_menu
+  lda #0
+  sta MENU_ID
   jmp restore_chat_screen
 
 
@@ -209,11 +211,11 @@ server_setup:
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
   displayText divider_line, #0,#0             // draw the divider line
-  displayText text_server_setup, #1,#15         // draw the menu title
+  displayText text_server_setup, #1,#15       // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
   displayText text_server_1, #5,#1
-  displayText divider_line, #11,#0            // draw the divider line
-  displayText text_wifi_2, #13,#3
+  displayText divider_line, #10,#0            // draw the divider line
+  displayText text_option_exit, #15,#3
   displayText divider_line, #22,#0            // draw the divider line
   displayBuffer SERVERNAME,#5,#14
   lda VICEMODE
@@ -221,10 +223,10 @@ server_setup:
   beq svr_vice      
   
 svr_vice 
-svr_input_fields                             //
+svr_input_fields                              //
   mva #0 curinh                               // Show the cursor 
   mva #5 rowcrs                               // Put the cursor in the Server Name field
-  mva #13 colcrs                               //
+  mva #13 colcrs                              //
   mva #15 FIELD_MIN                           //
   mva #38 FIELD_MAX                           //
   lda #32
@@ -234,27 +236,29 @@ svr_input_fields                             //
   lda #$1E                                    // step cursor left
   jsr writeText                               // now it becomes invisible   
 
+  displayText text_start_save_settings, #13,#3
 server_setup_key_input:
   jsr getKey
   cmp #255
   beq server_setup_key_input 
-  cmp #251                            // OPTION is pressed
+  cmp #251                                    // OPTION is pressed
   beq exit_to_main_menus
-  cmp #253                            // START is pressed
+  cmp #253                                    // START is pressed
   beq server_save_settings
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                               // clear keyboard buffer 
   jmp server_setup_key_input
   
 exit_to_main_menus
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                               // clear keyboard buffer 
   jmp main_menu
 
+  
 server_save_settings
   displayText text_save_settings, #23, #3
   jsr wait_for_RTR
   lda #246
   sta $D502
-  mva #5 temp_i   // Read servername and send it to cartridge
+  mva #5 temp_i                               // Read servername and send it to cartridge
   mva #14 temp_i+1
   mva #25 input_fld_len
   jsr read_field
@@ -279,7 +283,7 @@ wifi_setup:
   displayText divider_line, #2,#0             // draw the divider line
   displayText text_wifi_1, #5,#3
   displayText divider_line, #11,#0            // draw the divider line
-  displayText text_wifi_2, #13,#3
+  displayText text_option_exit, #15,#3
   displayText divider_line, #22,#0            // draw the divider line
   lda VICEMODE
   cmp #1
@@ -339,24 +343,24 @@ wifi_input_fields                             //
   lda #32
   jsr writeText
   jsr text_input
-  mva #1 curinh                       // hide the cursor
+  mva #1 curinh                               // hide the cursor
   lda #$1E
   jsr writeText
 
-  
+  displayText text_start_save_settings, #13,#3
 wifi_setup_key_input:
   jsr getKey
   cmp #255
   beq wifi_setup_key_input 
-  cmp #251                            // OPTION is pressed
+  cmp #251                                    // OPTION is pressed
   beq exit_to_main_menu
-  cmp #253                            // START is pressed
+  cmp #253                                    // START is pressed
   beq wifi_save_settings
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                               // clear keyboard buffer 
   jmp wifi_setup_key_input
   
 exit_to_main_menu
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                               // clear keyboard buffer 
   jmp main_menu
 
 wifi_save_settings
@@ -364,17 +368,17 @@ wifi_save_settings
   jsr wait_for_RTR
   lda #252
   sta $D502
-  mva #5 temp_i   // Read SSID and send it to cartridge
-  mva #9 temp_i+1
-  mva #27 input_fld_len
-  jsr read_field
+  mva #5 temp_i                               // Read SSID and send it to cartridge
+  mva #9 temp_i+1                             // temp_i (2 bytes) holds the row and column of the field
+  mva #27 input_fld_len                       // input_fld_len is the length of the field
+  jsr read_field                              // jump to the read_field sub routine
 
-  mva #7 temp_i   // Read password and send it to cartridge
+  mva #7 temp_i                               // Read password and send it to cartridge
   mva #13 temp_i+1
   mva #23 input_fld_len
   jsr read_field
 
-  mva #9 temp_i   // Read password and send it to cartridge
+  mva #9 temp_i                               // Read password and send it to cartridge
   mva #25 temp_i+1
   mva #10 input_fld_len
   jsr read_field
@@ -397,20 +401,19 @@ read_field:
   sta input_fld+1 // reset the input field pointer
   jsr open_field  // get a pointer to the start adres of the field
   ldy #0
-loopr
-  cpy input_fld_len
-  beq loopr_exit
-  lda (input_fld),y
-  jsr wait_for_RTR
-  sta $D502
-  iny
-  jmp loopr
-loopr_exit
-  jsr wait_for_RTR
-  lda #128
-  sta $D502
-
-  rts
+loopr                //
+  cpy input_fld_len  // compare y (our index) with the field length
+  beq loopr_exit     // if we reach the end of the field, exit
+  lda (input_fld),y  // read the field with index y
+  jsr wait_for_RTR   // wait for ready to receive on the cartridge
+  sta $D502          // write the data to the cartridge
+  iny                // increase our index
+  jmp loopr          // loop to read the next character
+loopr_exit           //
+  jsr wait_for_RTR   // after the field data has been send, we need
+  lda #128           // to close the transmission with byte 128
+  sta $D502          // send 128 to the cartridge
+  rts                // return
 
 // ---------------------------------------------------------------------
 // Open a field to read                  
@@ -418,30 +421,30 @@ loopr_exit
 // this procedure creates a pointer to the field in input_fld (2 bytes)               ;
 // ---------------------------------------------------------------------
 open_field:   
-  ldx temp_i                   // get the row
+  ldx temp_i                   // get the row (temp_i holds the rown number)
 sm_lineadd                     // sm_prt is the start of screen memory
-  clc
-  lda input_fld
-  adc #40
-  sta input_fld
-  bcc sm_ld_done
-  inc input_fld+1
-sm_ld_done
-  dex
-  bne sm_lineadd 
-  
-  ldx temp_i+1                // get the column 
-sm_rowadd 
-  clc
-  lda input_fld
-  adc #1
-  sta input_fld
-  bcc sm_rd_done
-  inc input_fld+1
-sm_rd_done
-  dex
-  bne sm_rowadd
-  rts
+  clc                          // clear carry
+  lda input_fld                // start at the start of screen memory
+  adc #40                      // add 40 chars (one row) 
+  sta input_fld                // store input_fld (this is the low byte of the pointer)
+  bcc sm_ld_done               // if carry is set (overflow), we need to increase the high byte
+  inc input_fld+1              // increase the high byte if needed
+sm_ld_done                     // one row added, done
+  dex                          // decrease x
+  bne sm_lineadd               // repeat the above if x is not zero
+                               // now we are on the right row, next skip to the right column
+  ldx temp_i+1                 // get the column 
+sm_rowadd                      //
+  clc                          // 
+  lda input_fld                //
+  adc #1                       // add one..
+  sta input_fld                // if we overflow, increase the high byte also
+  bcc sm_rd_done               //
+  inc input_fld+1              //
+sm_rd_done                     //
+  dex                          // decrease x and repeat if needed
+  bne sm_rowadd                //
+  rts                          // return to sender, just like Elvis baby!
 
 //=========================================================================================================
 //  Vice Simulation check
@@ -652,9 +655,13 @@ exit_on_return
   rts 
 
 handle_up
+  lda MENU_ID
+  cmp #10
+  bcs up_exit
   lda rowcrs                          // ignore this key if we are on the first line
   cmp #21
   bne upok
+up_exit
   mva #255 $2fc                       // clear keyboard buffer 
   jmp key_loop
 upok
@@ -662,6 +669,9 @@ upok
   jmp chrout
   
 handle_down
+  lda MENU_ID
+  cmp #10
+  bcs up_exit
   lda rowcrs                          // ignore this key if we are on the last line
   cmp #23
   bne downok
@@ -1154,11 +1164,14 @@ version_date .byte '10/2024',128
   .byte 'Time Offset from GMT: +0'
   .endl
 
-  .local text_wifi_2
-  .byte '[START]  Save Settings'
-  .byte  $9b,$9b,'   '
+  .local text_option_exit  
   .byte '[OPTION] Exit'
   .endl  
+
+  .local text_start_save_settings
+  .byte '[START]  Save Settings'
+  .endl  
+
   
   .local text_main_menu
   .byte 'MAIN MENU'
@@ -1279,7 +1292,7 @@ FIELD_MIN .byte 0
 VICEMODE .byte 0
 CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
-SERVERNAME .byte 'www.chat64.nl                 ',128
+SERVERNAME .byte 'www.chat64.nl          ',128
 
        
         
