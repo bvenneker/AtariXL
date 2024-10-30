@@ -4,6 +4,7 @@
 #include "common.h"
 
 char screenCode_to_Ascii(byte screenCode);
+char Atari_to_Ascii(byte ch);
 byte Ascii_to_screenCode(char ascii);
 
 static inline bool is_base64(unsigned char c) {

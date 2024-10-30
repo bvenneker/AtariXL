@@ -1,7 +1,3 @@
-// COLD RESTART
-// https://forums.atariage.com/topic/170304-xlxe-cold-start/#comment-2106862
-// dus jump naar: $e477? of naar het adres dat daar staat..
-
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include "common.h"
@@ -290,7 +286,7 @@ void loop() {
     }
 
     // 254 = Computer triggers call to the website for new public message
-    // 253 = new chat message from Computer to database
+    // 253 = New chat message from Computer to database
     // 252 = Computer sends the new wifi network name (ssid) AND password AND time offset
     // 251 = Computer ask for the current wifi ssid,password and time offset
     // 250 = Computer ask for the first full page of messages (during startup)
@@ -508,7 +504,7 @@ void loop() {
 
           ssid.trim();
           Serial.print("SSID=");
-          Serial.println(ssid);
+          Serial.println(ssid);          
           password = getValue(ns, 129, 1);
           password.trim();
           Serial.print("PASW=");
@@ -556,15 +552,13 @@ void loop() {
 
           if (!isWifiCoreConnected) {
             digitalWrite(CLED, LOW);
-            sendByte(16);  // INK
-            sendByte(2);   // RED
-            send_String_to_Bus("Not Connected to Wifi");
+            send_String_to_Bus("    Not Connected to Wifi         ");
           } else {
             wificonnected = 1;
-            digitalWrite(CLED, HIGH);
-            sendByte(16);  // INK
-            sendByte(4);   // GREEN
-            String wifi_status = "Connected, ip: " + myLocalIp;
+            digitalWrite(CLED, HIGH);          
+            String wifi_status = "Connected, ip: " + myLocalIp + "             ";
+            wifi_status = wifi_status.substring(0,35);
+
             send_String_to_Bus(wifi_status);
             if (configured == "empty") {
               configured = "w";
@@ -662,7 +656,6 @@ void loop() {
           settings.begin("mysettings", false);
           settings.putString("server", ns);  // store the new server name in the eeprom settings
           settings.end();
-
           messageIds[0] = 0;
           messageIds[1] = 0;
 
@@ -681,6 +674,7 @@ void loop() {
           char bns[inbuffersize + 1];
           // filter out any unwanted bytes, keep only ./01234567890
           for (int k = 0; k < inbuffersize; k++) {
+            inbuffer[k] = inbuffer[k]-32;
             if (inbuffer[k] < 45 or inbuffer[k] > 57) inbuffer[k] = 32;
           }
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -983,14 +977,15 @@ void send_String_to_Bus(String s) {
 void send_out_buffer_to_Bus() {
   // send the content of the outbuffer to the Bus
   for (int x = 0; x < outbuffersize - 1; x++) {
-    //delayMicroseconds(100);
-    sendByte(outbuffer[x]);
+    delayMicroseconds(500);    
     Serial.print(outbuffer[x]);
+    sendByte(outbuffer[x]);
   }
   // all done, send end byte
+  delayMicroseconds(500);
   sendByte(128);
   outbuffersize = 0;
-  Serial.println();
+  Serial.println("End");
 }
 
 // ******************************************************************************
@@ -1013,7 +1008,6 @@ void receive_buffer_from_Bus(int cnt) {
   // but in the configuration screens the Computer will send multiple items at once (like ssid and password)
 
   int i = 0;
-
   while (cnt > 0) {
     ready_to_receive(true);  // ready for next byte
     unsigned long timeOut = millis() + 500;
@@ -1030,8 +1024,8 @@ void receive_buffer_from_Bus(int cnt) {
     }
     ready_to_receive(false);
     dataFromBus = false;
-    inbuffer[i] = ch;
-    Serial.print(char(ch));
+    inbuffer[i] = Atari_to_Ascii(ch);  
+    //Serial.print(inbuffer[i]);  
     i++;
     if (i > 248) {  //this should never happen
 #ifdef debug
@@ -1045,7 +1039,7 @@ void receive_buffer_from_Bus(int cnt) {
       cnt--;
       inbuffer[i] = 129;
       i++;
-      Serial.println();
+      //Serial.println();
     }
   }
   i--;

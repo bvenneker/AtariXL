@@ -28,14 +28,19 @@ POKEY  = $D200
  
 color2 = $2c6
 color4 = $2c8
-start_color = $45
+
+input_fld = $15        // input field address $15 + $16
+temp_i = $17 
+input_fld_len = $1A    // length of the input field
 text_color = $36
 character = $3f 
-textPointer = $40
+textPointer = $40      // $40, $41 are a pointer. used in displayText
 textlen = $83
 rowcrs = $54          ; cursor row 
 colcrs = $55          ; cursor colm
 inputfield = $43      ; 43 and 44 hold a pointer to the main input field 
+start_color = $45
+splitIndex = $46
 
 putchar_ptr = $346    ; pointer to print routine
 curinh = $2F0         ; cursor inhibit, cursor is invisible if value is not zero
@@ -57,15 +62,29 @@ init
   sta color4
   sta color2
   sta character  
-  
-  
+  sta MENU_ID
+  sta SCREEN_ID
+  lda sm_prt
+  sta input_fld
+  lda sm_prt+1
+  sta input_fld+1
 
+  
 main 
   jsr startScreen
+  mva #1 curinh
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
-  
+  jsr are_we_in_the_matrix
+  jsr get_status 
+
 main_chat_screen:
+  lda VICEMODE
+  cmp #1  
+  bne mc_not_vice
+  displayText text_no_cartridge, #5,#6
+mc_not_vice
+
   mva #255 $2fc                       ; clear keyboard buffer
   mva #0 colcrs                       ; set cursor row position to zero  
   displayText divider_line, #20,#0    ; draw the divider line
@@ -74,11 +93,65 @@ main_chat_screen:
  
   jsr text_input    // jump to the text input routine
 
- 
+// ----------------------------------------------------------------------
+// Get the config status and the ESP Version
+// ----------------------------------------------------------------------
+get_status: 
+  lda VICEMODE
+  cmp #1
+  beq exit_gs
+
+  lda #236                                    // ask Cartridge for the wifi credentials
+  jsr send_start_byte_ff                      // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
+  
+  lda #1                                        // set the variables up for the splitbuffer command
+  sta splitIndex                                // we need the first element, so store #1 in splitIndex
+  jsr splitRXbuffer                             // and call spilt buffer
+  lda SPLITBUFFER                               // SPLITBUFFER NOW CONTAINS THE CONFIG_STATUS
+  sta CONFIG_STATUS                             // this is only one character, store it in config_status   
+                                                //
+  lda #2                                        // we need the second element out of the rxbuffer   
+  sta splitIndex                                // so put #2 in splitIndex and jump to split buffer   
+  jsr splitRXbuffer                             // SPLITBUFFER NOW CONTAINS THE SERVERNAME
+                                                // The servername is multiple characters so we need a loop to copy it to                                                  
+  ldx #0                                        // the server name variable   
+read_server_name                                // start of the loop
+  lda SPLITBUFFER,x                             // load a character from the splitbuffer   
+  sta SERVERNAME,x                              // store it in the servername variable   
+  cmp #32                                       // see if the character was a space character   
+  beq fin_server_name                           // if so, jump out of the loop   
+  cmp #128                                      // see if the character was byte 128      
+  beq fin_server_name                           // if so, jump out of the loop      
+  inx                                           // increase x for the next character   
+  jmp read_server_name                          // and repeat   
+fin_server_name
+  lda #128                                      // finish the servername variable with byte 128   
+  sta SERVERNAME,x                              //    
+  lda #3                                        // now get the third element from the rx buffer    
+  sta splitIndex                                // so put #3 in splitIndex and jump to split buffer    
+  jsr splitRXbuffer                             // SPLITBUFFER NOW CONTAINS THE SWVERSION
+                                                // The swversion is multiple characters so we need a loop
+  ldx #0                                        // to copy the text to the SWVERSION variable   
+read_swversion                                  // start of the loop
+  lda SPLITBUFFER,x                             // load a character from the splitbuffer    
+  sta SWVERSION,x                               // store it in the SWVERSION variable    
+  cmp #32                                       // see if the character was a space character    
+  beq fin_swversion                             // if so, jump out of the loop   
+  cmp #128                                      // see if the character was byte 128   
+  beq fin_swversion                             // if so, jump out of the loop   
+  inx                                           // increase x for the next character    
+  jmp read_swversion                            // and repeat   
+fin_swversion
+  lda #128                                      //    
+  sta SWVERSION,x                               // finish the SWVERSION variable with byte 128 
+
+exit_gs 
+  rts 
 // ----------------------------------------------------------------------
 // Main Menu
 // ----------------------------------------------------------------------
 main_menu:
+  mva #10 MENU_ID
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
   displayText divider_line, #0,#0    ; draw the divider line
@@ -93,7 +166,8 @@ main_menu:
   displayText MLINE_MAIN7, #17,#3
   displayText divider_line, #22,#0    ; draw the divider line
   displayText version_line, #23,#0    ; draw the version line
-  
+  displayBuffer SWVERSION,#23,#24
+  displayBuffer version,#23,#14
 main_menu_key_input:
   jsr getKey
   cmp #255
@@ -103,8 +177,13 @@ main_menu_key_input:
   beq exit_main_menu
   
   cmp #$31                            // key 1 is pressed
-  beq wifi_setup
-
+  bne cp_2 
+  jmp wifi_setup
+cp_2
+  cmp #$32
+  bne cp_3
+  jmp server_setup
+cp_3
   mva #255 $2fc                       ; clear keyboard buffer 
   jmp main_menu_key_input
   
@@ -120,35 +199,337 @@ restore_chat_screen:
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
   jmp main_chat_screen
+
+// ----------------------------------------------------------------------
+// Server setup screen
+// ----------------------------------------------------------------------
+server_setup:  
+  mva #255 $2fc                               // clear keyboard buffer
+  mva #12 MENU_ID
+  lda #$7D       ; load clear screen command
+  jsr writeText  ; print it to screen
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_server_setup, #1,#15         // draw the menu title
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText text_server_1, #5,#1
+  displayText divider_line, #11,#0            // draw the divider line
+  displayText text_wifi_2, #13,#3
+  displayText divider_line, #22,#0            // draw the divider line
+  displayBuffer SERVERNAME,#5,#14
+  lda VICEMODE
+  cmp #1
+  beq svr_vice      
   
+svr_vice 
+svr_input_fields                             //
+  mva #0 curinh                               // Show the cursor 
+  mva #5 rowcrs                               // Put the cursor in the Server Name field
+  mva #13 colcrs                               //
+  mva #15 FIELD_MIN                           //
+  mva #38 FIELD_MAX                           //
+  lda #32
+  jsr writeText
+  jsr text_input
+  mva #1 curinh                               // Hide the cursor
+  lda #$1E                                    // step cursor left
+  jsr writeText                               // now it becomes invisible   
+
+server_setup_key_input:
+  jsr getKey
+  cmp #255
+  beq server_setup_key_input 
+  cmp #251                            // OPTION is pressed
+  beq exit_to_main_menus
+  cmp #253                            // START is pressed
+  beq server_save_settings
+  mva #255 $2fc                       ; clear keyboard buffer 
+  jmp server_setup_key_input
+  
+exit_to_main_menus
+  mva #255 $2fc                       ; clear keyboard buffer 
+  jmp main_menu
+
+server_save_settings
+  displayText text_save_settings, #23, #3
+  jsr wait_for_RTR
+  lda #246
+  sta $D502
+  mva #5 temp_i   // Read servername and send it to cartridge
+  mva #14 temp_i+1
+  mva #25 input_fld_len
+  jsr read_field
+
+  mva #255 DELAY
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay  
+  jsr get_status 
+  jmp server_setup
 // ----------------------------------------------------------------------
 // Wifi setup screen
 // ----------------------------------------------------------------------
-  wifi_setup:  
+wifi_setup:  
+  mva #255 $2fc                               // clear keyboard buffer
+  mva #11 MENU_ID
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
-  displayText divider_line, #0,#0    ; draw the divider line
-  displayText text_wifi_setup, #1,#15    ; draw the menu title
-  displayText divider_line, #2,#0    ; draw the divider line
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_wifi_setup, #1,#15         // draw the menu title
+  displayText divider_line, #2,#0             // draw the divider line
   displayText text_wifi_1, #5,#3
-  displayText divider_line, #9,#0    ; draw the divider line
-  displayText text_wifi_2, #12,#3
-  displayText divider_line, #22,#0    ; draw the divider line
+  displayText divider_line, #11,#0            // draw the divider line
+  displayText text_wifi_2, #13,#3
+  displayText divider_line, #22,#0            // draw the divider line
+  lda VICEMODE
+  cmp #1
+  beq wf_vice  
+  
+wifi_get_cred
+  lda #248                                    // ask Cartridge for the wifi credentials
+  jsr send_start_byte_ff
+  displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the wifi status
+
+  lda #251                                    // ask Cartridge for the wifi credentials
+  jsr send_start_byte_ff                      // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
+  
+  mva #1 splitIndex                           //
+  jsr splitRXbuffer                           //
+  displayBuffer  SPLITBUFFER,#5 ,#9           // Display the buffers on screen (SSID name)
+  mva #2 splitIndex
+  jsr splitRXbuffer
+  displayBuffer  SPLITBUFFER,#7 ,#13          // Display the buffers on screen (SSID name)
+  mva #3 splitIndex
+  jsr splitRXbuffer
+  displayBuffer  SPLITBUFFER,#9 ,#25          // Display the buffers on screen (SSID name)
+                                              //
+wf_vice                                       //
+wifi_input_fields                             //
+  mva #0 curinh                               // Show the cursor 
+  mva #5 rowcrs                               // Put the cursor in the SSID field
+  mva #8 colcrs                               //
+  mva #10 FIELD_MIN                           //
+  mva #35 FIELD_MAX                           //
+  lda #32
+  jsr writeText
+  jsr text_input
+  mva #1 curinh                               // Hide the cursor
+  lda #$1E                                    // step cursor left
+  jsr writeText                               // now it becomes invisible  
+  
+  mva #255 $2fc                               // Clear keyboard buffer
+  mva #0 curinh                               // Show the cursor 
+  mva #7 rowcrs                               // Put the cursor in the password field
+  mva #12 colcrs 
+  mva #14 FIELD_MIN
+  mva #35 FIELD_MAX
+  lda #32
+  jsr writeText
+  jsr text_input
+  mva #1 curinh                               // hide the cursor
+  lda #$1E
+  jsr writeText
+  
+  mva #255 $2fc                               // clear keyboard buffer
+  mva #0 curinh                               // show the cursor 
+  mva #9 rowcrs                               // put the cursor in the time-offset field
+  mva #24 colcrs 
+  mva #26 FIELD_MIN
+  mva #32 FIELD_MAX
+  lda #32
+  jsr writeText
+  jsr text_input
+  mva #1 curinh                       // hide the cursor
+  lda #$1E
+  jsr writeText
+
   
 wifi_setup_key_input:
   jsr getKey
   cmp #255
-  beq wifi_setup_key_input
-  
+  beq wifi_setup_key_input 
   cmp #251                            // OPTION is pressed
   beq exit_to_main_menu
-  
+  cmp #253                            // START is pressed
+  beq wifi_save_settings
   mva #255 $2fc                       ; clear keyboard buffer 
   jmp wifi_setup_key_input
   
 exit_to_main_menu
   mva #255 $2fc                       ; clear keyboard buffer 
   jmp main_menu
+
+wifi_save_settings
+  displayText text_save_settings, #23, #3
+  jsr wait_for_RTR
+  lda #252
+  sta $D502
+  mva #5 temp_i   // Read SSID and send it to cartridge
+  mva #9 temp_i+1
+  mva #27 input_fld_len
+  jsr read_field
+
+  mva #7 temp_i   // Read password and send it to cartridge
+  mva #13 temp_i+1
+  mva #23 input_fld_len
+  jsr read_field
+
+  mva #9 temp_i   // Read password and send it to cartridge
+  mva #25 temp_i+1
+  mva #10 input_fld_len
+  jsr read_field
+
+  mva #255 DELAY
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jmp wifi_get_cred
+
+// ---------------------------------------------------------------------
+// read a field and send it to the cartridge
+// input row and column in temp_i and temp_i+1
+// ---------------------------------------------------------------------
+read_field:
+  lda sm_prt      // reset the input field pointer
+  sta input_fld   // reset the input field pointer
+  lda sm_prt+1    // reset the input field pointer
+  sta input_fld+1 // reset the input field pointer
+  jsr open_field  // get a pointer to the start adres of the field
+  ldy #0
+loopr
+  cpy input_fld_len
+  beq loopr_exit
+  lda (input_fld),y
+  jsr wait_for_RTR
+  sta $D502
+  iny
+  jmp loopr
+loopr_exit
+  jsr wait_for_RTR
+  lda #128
+  sta $D502
+
+  rts
+
+// ---------------------------------------------------------------------
+// Open a field to read                  
+// input row and column in temp_i and temp_i+1               
+// this procedure creates a pointer to the field in input_fld (2 bytes)               ;
+// ---------------------------------------------------------------------
+open_field:   
+  ldx temp_i                   // get the row
+sm_lineadd                     // sm_prt is the start of screen memory
+  clc
+  lda input_fld
+  adc #40
+  sta input_fld
+  bcc sm_ld_done
+  inc input_fld+1
+sm_ld_done
+  dex
+  bne sm_lineadd 
+  
+  ldx temp_i+1                // get the column 
+sm_rowadd 
+  clc
+  lda input_fld
+  adc #1
+  sta input_fld
+  bcc sm_rd_done
+  inc input_fld+1
+sm_rd_done
+  dex
+  bne sm_rowadd
+  rts
+
+//=========================================================================================================
+//  Vice Simulation check
+//=========================================================================================================
+are_we_in_the_matrix:                             // 
+  mva #0 VICEMODE                                 // this is to check if a real cartridge is attached
+                                                  // or if we are running in the a simulator
+                                                  // 
+  jsr wait_for_RTR                                // 
+  lda #245                                        // Load number #245 (to check if the esp32 is connected)
+  sta $D502                                       // write the byte to IO1
+                                                  // 
+                                                  // Send the ROM version to the cartrdige
+  ldx #0                                          // x will be our index when we loop over the version text
+sendversion                                       // 
+  jsr wait_for_RTR                                // wait for ready to receive (bit D7 goes high)
+  lda version,x                                   // load a byte from the version text with index x
+  
+  sta $D502                                       // send it to IO1
+  cmp #128                                        // if the last byte was 128, the buffer is finished
+  beq check_matrix                                // exit in that case
+  inx                                             // increase the x index
+  jmp sendversion                                 // jump back to send the next byte
+
+check_matrix                                      // 
+  lda #100                                        // Delay 100... hamsters
+  sta DELAY                                       // Store 100 in the DELAY variable
+  jsr jdelay                                      // and call the delay subroutine
+  jsr wait_for_RTS                                                // 
+  lda $D502                                       // read from cartridge
+  cmp #128                                        // 
+                                                  // 
+  beq exit_sim_check                              // if vice mode, we do not try to communicate with the
+  lda #1                                          // cartridge because it will result in error
+  sta VICEMODE                                    //  
+                                                  //
+exit_sim_check                                    // 
+  lda #100                                        // Delay 100... hamsters
+  sta DELAY                                       // Store 100 in the DELAY variable
+  jsr jdelay                                     // and call the delay subroutine
+  rts    
+    
+// ---------------------------------------------------------------------
+// Send a command byte to the cartridge and wait for response;
+// command in b                          ;
+// ---------------------------------------------------------------------
+send_start_byte_ff:                     //
+  jsr wait_for_RTR
+  sta $D502                             // send the command byte
+  ldx #0
+ff_response_loop                        // now wait for a response
+  jsr wait_for_RTS
+  lda $D502
+  sta RXBUFFER,x
+  cmp #128
+  beq ff_end_buffer
+  inx
+  jmp ff_response_loop
+  
+ff_end_buffer
+  inx
+  lda #128
+  sta RXBUFFER,x
+  rts
+  
+// ----------------------------------------------------------------------
+// Wait until the cartridge is ready to receive data (RTR)
+// ----------------------------------------------------------------------
+wait_for_RTR:
+  pha
+wait_for_RTR2  
+  lda $D500       // check RTR
+  and #%00000001
+  cmp #%00000001
+  bne wait_for_RTR2
+  pla
+  rts
+  
+// ----------------------------------------------------------------------
+// Wait until the cartridge is ready to send data (RTS)
+// ----------------------------------------------------------------------
+wait_for_RTS:
+  lda $D501       // check RTS
+  and #%00000010
+  cmp #%00000010
+  bne wait_for_RTS
+  rts
+
   
 // ----------------------------------------------------------------------
 // procedure for text input
@@ -173,24 +554,55 @@ cpdelete
    
 cpreturn
   cmp #13
-  beq handle_return
+  bne cp_up 
+  jmp handle_return
 
-cpCursorKeys  
+// cpCursorKeys  
+
+cp_up
   cmp #142     
-  beq handle_up
+  bne cp_down 
+  jmp handle_up
+cp_down
   cmp #143
-  beq handle_down
-  cmp #134
-  beq handle_left
+  bne cp_left 
+  jmp handle_down  
+cp_left
+  cmp #134  
+  bne cp_right
+  jmp handle_left
+cp_right
   cmp #135
-  beq handle_right
+  bne chrout
+  jmp handle_right
 
 chrout
+  pha
+  lda MENU_ID
+  cmp #10
+  bcs in_field  
+out_ok    
+  pla  
   jsr writeText
+out_exit
   mva #255 $2fc                       ; clear keyboard buffer 
   jmp key_loop
+in_field  
+  lda colcrs
+  cmp FIELD_MAX
+  bcc out_ok
+  pla
+  jsr writeText
+  lda #$1E
+  jsr writeText
+  jmp out_exit  
+
 
 handle_delete
+  lda MENU_ID
+  cmp #10
+  bcs del_in_field
+hd_ok  
   lda rowcrs
   cmp #21
   bne delok
@@ -220,11 +632,25 @@ delcont                       // Man this is getting ugly..
 delexit
   mva #255 $2fc
   jmp key_loop
+
+del_in_field         
+  lda colcrs         
+  cmp FIELD_MIN
+  bcc delexit
+  lda #$7E
+  jsr writeText
+  jmp delexit
+  
          
 handle_return
+  lda MENU_ID
+  cmp #10
+  bcs exit_on_return 
   lda #$9b
   jmp chrout
- 
+exit_on_return 
+  rts 
+
 handle_up
   lda rowcrs                          // ignore this key if we are on the first line
   cmp #21
@@ -246,12 +672,32 @@ downok
   jmp chrout
 
 handle_left
+  lda MENU_ID
+  cmp #10
+  bcs lf_limit 
+hl_ok
   lda #$1E
   jmp chrout
-
+lf_limit
+  lda colcrs
+  cmp FIELD_MIN
+  bcs hl_ok
+  jmp hr_ng
+  
 handle_right
+  lda MENU_ID
+  cmp #10
+  bcs rf_limit
+hr_ok
   lda #$1F
   jmp chrout
+rf_limit  
+  lda colcrs  
+  cmp FIELD_MAX
+  bcc hr_ok
+hr_ng
+  mva #255 $2fc                       // clear keyboard buffer 
+  jmp key_loop
 
 
 // ----------------------------------------------------------------------
@@ -532,7 +978,37 @@ prHelp
   lda #254
   rts
   
-
+//=========================================================================================================
+//    SUB ROUTINE TO SPLIT RXBUFFER
+//=========================================================================================================
+splitRXbuffer:                                   //
+                                                  // RXBUFFER now contains FOR EXAMPLE macaddress[129]regid[129]nickname[129]regstatus[128]
+    ldx #0                                        // load zero into x and y    
+    ldy #0                                        //   
+sp_read:                                            // read a byte from the index buffer   
+    lda RXBUFFER,x                                // copy that byte to the split buffer   
+    sta SPLITBUFFER,y                             // until we find byte 129   
+    cmp #129                                      //    
+    beq sp_n                                        //    
+    cmp #128                                      // or the end of line character   
+    beq sp_n                                        //    
+    inx                                           // increase the x index   
+    iny                                           // and also the y index   
+    jmp sp_read                                    // back to the start to get the next character   
+sp_n:                                                //    
+    lda #128                                      //     
+    sta SPLITBUFFER,y                             // load 128 (the end byte) into the splitbuffer   
+    dec splitIndex                                       // decrease $02. This address holds a number that indicates   
+    lda splitIndex                                       // which word we need from the RXBUFFER   
+    cmp #0                                        // so if $02 is equal to zero, we have the right word   
+    beq sp_exit                                    // exit in that case   
+    ldy #0                                        // if we need the next word   
+    inx                                           // we reset the y index,   
+    jmp sp_read                                    // increase the x index   
+                                                  // and get the next word from the RX buffer
+sp_exit:                                            // 
+    rts                                           // return.   
+                                                  // 
 // ----------------------------------------------------------------------
 // Start Screen
 // ----------------------------------------------------------------------
@@ -564,6 +1040,22 @@ wkey1
 
 
 // ----------------------------------------------------------------------
+// displayBuffer, used in macro displayRXBuffer
+// ----------------------------------------------------------------------
+displayBufferk:
+  mva #1 curinh  
+db_next_char  
+  ldy character
+  lda (textPointer),y  
+  cmp #128
+  beq db_exit
+  jsr writeText
+  inc character
+  jmp db_next_char
+db_exit
+  rts
+
+// ----------------------------------------------------------------------
 // displayTextk, used in macro displayText
 // ----------------------------------------------------------------------
 displayTextk:  
@@ -577,8 +1069,6 @@ next_char
   jsr writeText
   inc character
   jmp next_char
-
-
 exit_dpt
   rts
   
@@ -634,15 +1124,24 @@ readRTS:
   beq resetAtari   
 exitRTS
   rts
-  
+
+
+// ----------------------------------------------------------------------
+// Reset the Atari
+// ----------------------------------------------------------------------
 resetAtari:  
    jmp $E477      // jump to reboot vector to restart the Atari.
+
+  
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-version .byte '3.77'
-version_date .byte '10/2024'
+version .byte '3.77',128
+version_date .byte '10/2024',128
 
+  .local text_no_cartridge
+  .byte 'Cartridge Not Installed!'
+  .endl
   .local text_wifi_setup
   .byte 'WIFI SETUP'
   .endl
@@ -651,10 +1150,12 @@ version_date .byte '10/2024'
   .byte 'SSID:'
   .byte  $9b,$9b,'   '
   .byte 'PASSWORD:'
+  .byte  $9b,$9b,'   '
+  .byte 'Time Offset from GMT: +0'
   .endl
 
   .local text_wifi_2
-  .byte '[START]  Safe Settings'
+  .byte '[START]  Save Settings'
   .byte  $9b,$9b,'   '
   .byte '[OPTION] Exit'
   .endl  
@@ -663,8 +1164,23 @@ version_date .byte '10/2024'
   .byte 'MAIN MENU'
   .endl
   
+  .local text_server_setup
+  .byte 'SERVER SETUP'
+  .endl
+  
+  .local text_server_1
+  .byte 'Server name:'
+  .byte  $9b,$9b,' '
+  .byte 'Example: www.chat64.nl'  
+  .endl
+
+  
   .local version_line
   .byte ' Version  ROM x.xx  ESP x.xx    10/2024'
+  .endl
+  
+  .local text_save_settings
+  .byte 'Saving Settings, please wait..     '
   .endl
   
   .local MLINE_MAIN1
@@ -754,12 +1270,37 @@ DELAY  .byte 0,0
 z_as .byte 0,0
 cursorphase  .byte 0,0
 temppos  .byte 0,0   
-        
-   
+RXBUFFER :250 .byte 128        
+SPLITBUFFER :40 .byte 128   
+MENU_ID .byte 0
+SCREEN_ID .byte 0
+FIELD_MAX .byte 0
+FIELD_MIN .byte 0
+VICEMODE .byte 0
+CONFIG_STATUS .byte 0,128
+SWVERSION .byte '9.99',128
+SERVERNAME .byte 'www.chat64.nl                 ',128
+
        
         
  run init
   
+// -----------------------------------
+// Print the RX Buffer on screen
+// line = 0 - 23
+// column = 0,39
+// -----------------------------------
+.macro displayBuffer buffer,line,column
+  mva :line rowcrs 
+  mva :column colcrs  
+  mva #0 character
+  lda #<(:buffer) 
+  sta textPointer
+  lda #>(:buffer)
+  sta textPointer+1
+  jsr displayBufferk  
+.endm  
+
 
 // -----------------------------------
 // text = the text
@@ -778,4 +1319,5 @@ temppos  .byte 0,0
   sta textPointer+1
   jsr displayTextk  
 .endm  
+
   
