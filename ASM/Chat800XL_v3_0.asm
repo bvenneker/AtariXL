@@ -184,6 +184,10 @@ cp_2
   bne cp_3
   jmp server_setup
 cp_3
+  cmp #$33
+  bne cp_4
+  jmp account_setup
+cp_4
   mva #255 $2fc                       ; clear keyboard buffer 
   jmp main_menu_key_input
   
@@ -201,6 +205,74 @@ restore_chat_screen:
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
   jmp main_chat_screen
+
+// ----------------------------------------------------------------------
+// Account_setup screen
+// ----------------------------------------------------------------------
+account_setup:
+  mva #255 $2fc                               // clear keyboard buffer
+  mva #12 MENU_ID
+  lda #$7D       ; load clear screen command
+  jsr writeText  ; print it to screen
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_account_setup, #1,#15       // draw the menu title
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText text_account_1, #5,#1
+  displayText divider_line, #10,#0            // draw the divider line
+  displayText text_option_exit, #15,#3
+  displayText divider_line, #22,#0            // draw the divider line
+  
+  lda VICEMODE
+  cmp #1
+  beq acc_vice      
+  
+acc_vice 
+acc_input_fields                              //
+  mva #0 curinh                               // Show the cursor 
+  mva #7 rowcrs                               // Put the cursor in the registration id field
+  mva #10 colcrs                              //
+  mva #10 FIELD_MIN                           //
+  mva #38 FIELD_MAX                           //
+  lda #32
+  jsr writeText
+  jsr text_input
+  mva #1 curinh                               // Hide the cursor
+  lda #$1E                                    // step cursor left
+  jsr writeText                               // now it becomes invisible   
+
+  displayText text_start_save_settings, #13,#3
+account_setup_key_input:
+  jsr getKey
+  cmp #255
+  beq account_setup_key_input 
+  cmp #251                                    // OPTION is pressed
+  beq exit_to_main_menus
+  cmp #253                                    // START is pressed
+  beq account_save_settings
+  mva #255 $2fc                               // clear keyboard buffer 
+  jmp account_setup_key_input
+  
+exit_to_main_menus
+  mva #255 $2fc                               // clear keyboard buffer 
+  jmp main_menu
+
+account_save_settings
+  displayText text_save_settings, #23, #3
+  jsr wait_for_RTR
+  lda #246
+  sta $D502
+  mva #5 temp_i                               // Read servername and send it to cartridge
+  mva #14 temp_i+1
+  mva #25 input_fld_len
+  jsr read_field
+
+  mva #255 DELAY
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay  
+  jsr get_status 
+  jmp account_setup
 
 // ----------------------------------------------------------------------
 // Server setup screen
@@ -1187,6 +1259,15 @@ version_date .byte '10/2024',128
   .byte 'Example: www.chat64.nl'  
   .endl
 
+  .local text_server_setup
+  .byte 'ACCOUNT SETUP'
+  .endl
+  
+  .local text_account_1
+  .byte 'MAC Address:'
+  .byte  $9b,$9b,' '
+  .byte 'Registration ID:'  
+  .endl
   
   .local version_line
   .byte ' Version  ROM x.xx  ESP x.xx    10/2024'
