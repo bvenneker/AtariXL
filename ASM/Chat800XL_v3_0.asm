@@ -1,8 +1,5 @@
 // special characters: https://www.youtube.com/watch?v=fOrMwNBoC7E&list=PLmzSn5Wy9uF8nTsZBtdk1yHzFI5JXoUJT&index=7
 
-// geheugen toevoegen aan 600XL: https://www.youtube.com/watch?v=jyWtzC96kZo
-
-
 // https://www.atarimax.com/jindroush.atari.org/acarts.html
 // https://atariwiki.org/wiki/Wiki.jsp?page=Cartridges
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
@@ -101,8 +98,8 @@ get_status:
   cmp #1
   beq exit_gs
 
-  lda #236                                    // ask Cartridge for the wifi credentials
-  jsr send_start_byte_ff                      // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
+  lda #236                                      // ask Cartridge for the wifi credentials
+  jsr send_start_byte_ff                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
   
   lda #1                                        // set the variables up for the splitbuffer command
   sta splitIndex                                // we need the first element, so store #1 in splitIndex
@@ -280,8 +277,8 @@ account_save_settings
 server_setup:  
   mva #255 $2fc                               // clear keyboard buffer
   mva #12 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  lda #$7D                                    // load clear screen command
+  jsr writeText                               // print it to screen
   displayText divider_line, #0,#0             // draw the divider line
   displayText text_server_setup, #1,#15       // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
@@ -309,6 +306,7 @@ svr_input_fields                              //
   jsr writeText                               // now it becomes invisible   
 
   displayText text_start_save_settings, #13,#3
+  
 server_setup_key_input:
   jsr getKey
   cmp #255
@@ -342,14 +340,15 @@ server_save_settings
   jsr jdelay  
   jsr get_status 
   jmp server_setup
+  
 // ----------------------------------------------------------------------
 // Wifi setup screen
 // ----------------------------------------------------------------------
 wifi_setup:  
   mva #255 $2fc                               // clear keyboard buffer
   mva #11 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  lda #$7D                                    // load clear screen command
+  jsr writeText                               // print it to screen
   displayText divider_line, #0,#0             // draw the divider line
   displayText text_wifi_setup, #1,#15         // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
@@ -365,10 +364,8 @@ wifi_get_cred
   lda #248                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff
   displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the wifi status
-
   lda #251                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff                      // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
-  
   mva #1 splitIndex                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#9           // Display the buffers on screen (SSID name)
@@ -444,12 +441,10 @@ wifi_save_settings
   mva #9 temp_i+1                             // temp_i (2 bytes) holds the row and column of the field
   mva #27 input_fld_len                       // input_fld_len is the length of the field
   jsr read_field                              // jump to the read_field sub routine
-
   mva #7 temp_i                               // Read password and send it to cartridge
   mva #13 temp_i+1
   mva #23 input_fld_len
   jsr read_field
-
   mva #9 temp_i                               // Read password and send it to cartridge
   mva #25 temp_i+1
   mva #10 input_fld_len
@@ -467,25 +462,25 @@ wifi_save_settings
 // input row and column in temp_i and temp_i+1
 // ---------------------------------------------------------------------
 read_field:
-  lda sm_prt      // reset the input field pointer
-  sta input_fld   // reset the input field pointer
-  lda sm_prt+1    // reset the input field pointer
-  sta input_fld+1 // reset the input field pointer
-  jsr open_field  // get a pointer to the start adres of the field
+  lda sm_prt          // reset the input field pointer
+  sta input_fld       // reset the input field pointer
+  lda sm_prt+1        // reset the input field pointer
+  sta input_fld+1     // reset the input field pointer
+  jsr open_field      // get a pointer to the start adres of the field
   ldy #0
-loopr                //
-  cpy input_fld_len  // compare y (our index) with the field length
-  beq loopr_exit     // if we reach the end of the field, exit
-  lda (input_fld),y  // read the field with index y
-  jsr wait_for_RTR   // wait for ready to receive on the cartridge
-  sta $D502          // write the data to the cartridge
-  iny                // increase our index
-  jmp loopr          // loop to read the next character
-loopr_exit           //
-  jsr wait_for_RTR   // after the field data has been send, we need
-  lda #128           // to close the transmission with byte 128
-  sta $D502          // send 128 to the cartridge
-  rts                // return
+loopr                 //
+  cpy input_fld_len   // compare y (our index) with the field length
+  beq loopr_exit      // if we reach the end of the field, exit
+  lda (input_fld),y   // read the field with index y
+  jsr wait_for_RTR    // wait for ready to receive on the cartridge
+  sta $D502           // write the data to the cartridge
+  iny                 // increase our index
+  jmp loopr           // loop to read the next character
+loopr_exit            //
+  jsr wait_for_RTR    // after the field data has been send, we need
+  lda #128            // to close the transmission with byte 128
+  sta $D502           // send 128 to the cartridge
+  rts                 // return
 
 // ---------------------------------------------------------------------
 // Open a field to read                  
@@ -556,7 +551,7 @@ check_matrix                                      //
 exit_sim_check                                    // 
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
-  jsr jdelay                                     // and call the delay subroutine
+  jsr jdelay                                      // and call the delay subroutine
   rts    
     
 // ---------------------------------------------------------------------
@@ -610,7 +605,7 @@ wait_for_RTS:
 // procedure for text input
 // ----------------------------------------------------------------------
 text_input:
-  mva #0 curinh     // show the cursor 
+  mva #0 curinh              // show the cursor 
 key_loop
   //jsr blinkCursor
   jsr getKey
@@ -620,7 +615,7 @@ key_loop
 cpoption
   cmp #251
   bne cpdelete
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                       // clear keyboard buffer 
   jmp main_menu
   
 cpdelete  
@@ -632,9 +627,9 @@ cpreturn
   bne cp_up 
   jmp handle_return
 
-// cpCursorKeys  
+ 
 
-cp_up
+cp_up                               // check the cursor keys up down left right
   cmp #142     
   bne cp_down 
   jmp handle_up
@@ -651,7 +646,7 @@ cp_right
   bne chrout
   jmp handle_right
 
-chrout
+chrout                               // output the key to screen
   pha
   lda MENU_ID
   cmp #10
@@ -1006,7 +1001,7 @@ kb2asci:
 
 getKey:   
   jsr readRTS                           // check for incomming data or reset request   
-  lda $D01F  // is one of the 'function keys' pressed?
+  lda $D01F                             // is one of the console keys pressed?
   and #7
   cmp #6
   beq prSTART
@@ -1015,12 +1010,12 @@ getKey:
   cmp #3
   beq prOPTION
   
-  lda $02DC  // is the HELP key pressed ?
+  lda $02DC                             // is the HELP key pressed ?
   and #1
   cmp #1
   beq prHELP
   
-  lda $2FC  // is there a key in the keyboard buffer?
+  lda $2FC                              // is there a key in the keyboard buffer?
   cmp #255
   beq exit_getkey
 
@@ -1212,7 +1207,7 @@ exitRTS
 // Reset the Atari
 // ----------------------------------------------------------------------
 resetAtari:  
-   jmp $E477      // jump to reboot vector to restart the Atari.
+   jmp $E477            // jump to reboot vector to restart the Atari.
 
   
 // ----------------------------------------------------------------
@@ -1243,7 +1238,6 @@ version_date .byte '10/2024',128
   .local text_start_save_settings
   .byte '[START]  Save Settings'
   .endl  
-
   
   .local text_main_menu
   .byte 'MAIN MENU'
