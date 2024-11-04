@@ -714,7 +714,7 @@ wait_for_RTS:
 // procedure for text input
 // ----------------------------------------------------------------------
 text_input:
-  mva #0 curinh              // show the cursor 
+  mva #0 curinh                        // show the cursor 
 key_loop
   //jsr blinkCursor
   jsr getKey
@@ -764,7 +764,7 @@ out_ok
   pla  
   jsr writeText
 out_exit
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                      // clear keyboard buffer 
   jmp key_loop
 in_field  
   lda colcrs
@@ -1443,8 +1443,6 @@ VICEMODE .byte 0
 CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
-
-       
         
  run init
   
