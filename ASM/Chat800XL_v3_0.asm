@@ -55,9 +55,9 @@ init
   adc #3                 ; add 3
   sta inputfield+1       ; store in $44.
   
-  lda #0  
-  sta color4
-  sta color2
+//  lda #0  
+//  sta color4
+//  sta color2
   sta character  
   sta MENU_ID
   sta SCREEN_ID
@@ -68,7 +68,7 @@ init
 
   
 main 
-  jsr startScreen
+  jsr startScreen2
   mva #1 curinh
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
@@ -1184,7 +1184,81 @@ sp_exit:                                            //
 // ----------------------------------------------------------------------
 // Start Screen
 // ----------------------------------------------------------------------
+// data for big letters on the start screen
+sc_big_text:                                 
+	.byte 0,0,0,0,0,0,0,0
+	.byte 81,91,91,69,124,0,0,124
+	.byte 81,91,91,69,82,87,82,0
+	.byte 81,91,91,69,124,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 125,0,0,0,124,0,0,124
+	.byte 124,0,0,124,0,124,0,0
+	.byte 125,0,0,0,124,0,0,124
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 125,0,0,0,65,82,82,68
+	.byte 65,82,82,68,0,124,0,0
+	.byte 125,91,91,69,90,82,82,68
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 125,0,0,0,124,0,0,124
+	.byte 124,0,0,124,0,124,0,0
+	.byte 125,0,0,124,0,0,0,124
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 90,123,123,67,124,0,0,124
+	.byte 124,0,0,124,0,124,0,0
+	.byte 90,123,123,67,0,0,0,124
+	.byte 0,0,0,0,0,0,0,0
+	.byte 255 
+	   
+             
+startScreen2:
+  jsr clear_keyboard_and_screen
+  lda sm_prt
+  sta temp_i
+  lda sm_prt+1
+  sta temp_i+1
+  inc temp_i+1
+  inc temp_i+1
+  inc temp_i+1  
+  lda #16
+  
+  sta temp_i
+  ldy #239
+ss2
+  lda #85 
+  sta (temp_i),y
+  lda #213 
+  sta (sm_prt),y
+  
+  dey
+  cpy #255
+  bne ss2
 
+  lda sm_prt
+  sta temp_i
+  sta temp_i
+  lda sm_prt+1
+  sta temp_i+1
+  inc temp_i+1
+  lda #128
+  sta temp_i
+  ldy #0
+ss_big_letters
+  lda sc_big_text,y
+  cmp #255
+  beq wkey2
+  sta (temp_i),y
+  iny
+  jmp ss_big_letters
+wkey2  
+  jsr readRTS                           // check for incomming data or reset request
+  lda $02FC                             // wait for any key
+  cmp #255                              // see if last key equals zero
+  beq wkey2   
+  rts
 
 startScreen:
   mwa VDSLST dVDSLST   
