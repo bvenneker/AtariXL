@@ -53,14 +53,14 @@ WiFiResponseMessage responseMessage;
 #define RCLK GPIO_NUM_14    // RCLK signal to the 165 shift register
 #define sclk2 GPIO_NUM_25   // serial clock signal to the shift register
 #define oSdata GPIO_NUM_33  // serial data to output buffer
-#define RTR GPIO_NUM_4      // Ready to receive signal
-#define RTS GPIO_NUM_26     // Ready to send signal
+#define RTR GPIO_NUM_32     // Ready to receive signal
+#define RTS GPIO_NUM_4      // Ready to send signal
 
 
 // ********************************
 // **        INPUTS             **
 // ********************************
-#define resetSwitch GPIO_NUM_15  // this pin outputs PWM signal at boot
+#define resetSwitch GPIO_NUM_26   
 #define BusIO1 GPIO_NUM_22
 #define sdata GPIO_NUM_34
 #define BusIO2 GPIO_NUM_13
