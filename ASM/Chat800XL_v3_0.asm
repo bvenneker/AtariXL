@@ -149,8 +149,7 @@ exit_gs
 // ----------------------------------------------------------------------
 main_menu:
   mva #10 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0    ; draw the divider line
   displayText text_main_menu, #1,#15    ; draw the menu title
   displayText divider_line, #2,#0    ; draw the divider line
@@ -198,7 +197,7 @@ cp_6
   jmp help_screen
   
 no_match  
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                       // clear keyboard buffer 
   jmp main_menu_key_input
   
 exit_main_menu
@@ -234,10 +233,12 @@ about_screen:
   mva #15 MENU_ID
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
-  displayText text_about_screen, #1,#15       // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
+  displayText text_about_screen, #1,#15       // draw the menu title and text
+  displayText text_about_screen2, #10,#0       // draw the more text
+  
   displayText divider_line, #22,#0            // draw the divider line
-  displayText MLINE_MAIN7, #4,#23             // draw the menu on the bottom line
+  displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
   jmp help_get_key_input                      // wait for user to press 7 to exit
 // ----------------------------------------------------------------------
 // Help screen
@@ -246,15 +247,19 @@ help_screen:                                  //
   mva #16 MENU_ID                             //
   jsr clear_keyboard_and_screen               //
   displayText divider_line, #0,#0             // draw the divider line
-  displayText text_help_screen, #1,#15        // draw the menu title
+  displayText text_help_screen, #1,#15        // draw the menu title and text
+  displayText text_help_screen2, #10,#0        // draw more text
   displayText divider_line, #2,#0             // draw the divider line
   displayText divider_line, #22,#0            // draw the divider line
-  displayText MLINE_MAIN7, #4,#23             // draw the menu on the bottom line
+  displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
                                               //
 help_get_key_input                            //
   jsr getKey                                  // wait for a key
+  cmp #251
+  beq hlp_exit
   cmp #$37                                    // key 7 is pressed
   bne help_get_key_input                      // if not, wait for key again
+hlp_exit
   mva #255 $2fc                               // clear keyboard buffer 
   jmp main_menu                               // exit to main menu
 
@@ -269,17 +274,20 @@ help_get_key_input                            //
 // ----------------------------------------------------------------------
 user_list:
   mva #14 MENU_ID
+  mva #234 TEMPI
+ul_start
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
   displayText text_user_list, #1,#15          // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
   displayText divider_line, #22,#0            // draw the divider line
-  displayText text_user_list_foot, #4,#23     // draw the menu on the bottom line
+  displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
   lda VICEMODE
   cmp #1
   beq ul_vice 
 
-  lda #234
+
+  lda TEMPI
   jsr send_start_byte_ff                      // RXBUFFER now contains the first group of users, 20
   displayBuffer RXBUFFER,#3 ,#0
 
@@ -292,7 +300,8 @@ user_list:
 ul_vice
 ul_get_key_input  
   jsr getKey
-  cmp #$37                                    // key 7 is pressed(exit)
+  //cmp #$37                                  // key 7 is pressed(exit)
+  cmp #251                                    // OPTION key is pressed
   beq ul_exit_main_menu
   cmp #$6E                                    // key 'n' is pressed
   beq ul_next
@@ -300,10 +309,15 @@ ul_get_key_input
   beq ul_prev  
   jmp ul_get_key_input
 
+ul_next
+  mva #233 TEMPI
+  jmp ul_start
+  
+ul_prev
+  jmp user_list
+  
 ul_exit_main_menu
-  lda #0
-  sta MENU_ID
-  jmp restore_chat_screen
+  jmp main_menu
 
 // ----------------------------------------------------------------------
 // Account_setup screen
@@ -340,16 +354,26 @@ acc_vice                                      //
 acc_input_fields                              //
   mva #0 curinh                               // Show the cursor 
   mva #7 rowcrs                               // Put the cursor in the registration id field
-  mva #10 colcrs                              //
-  mva #10 FIELD_MIN                           //
-  mva #38 FIELD_MAX                           //
+  mva #17 colcrs                              //
+  mva #19 FIELD_MIN                           //
+  mva #35 FIELD_MAX                           //
   lda #32                                     //
   jsr writeText                               //
   jsr text_input                              //
+
+  mva #255 $2fc                               // Clear keyboard buffer
+  mva #9 rowcrs                               // Put the cursor in the Nick Name field
+  mva #11 colcrs                              //
+  mva #13 FIELD_MIN                           //
+  mva #21 FIELD_MAX                           //
+  lda #32                                     //
+  jsr writeText                               //
+  jsr text_input                              //
+
   mva #1 curinh                               // Hide the cursor
   lda #$1E                                    // step cursor left
   jsr writeText                               // now it becomes invisible   
-
+  
   displayText text_start_save_settings, #13,#3
 account_setup_key_input:
   jsr getKey
@@ -429,7 +453,7 @@ server_setup_key_input:
   mva #255 $2fc                               // clear keyboard buffer 
   jmp server_setup_key_input
   
-svr_exit_to_main_menu
+srv_exit_to_main_menu
   mva #255 $2fc                               // clear keyboard buffer 
   jmp main_menu
 
@@ -1291,7 +1315,7 @@ version_date .byte '10/2024',128
   .byte 'USER LIST'
   .endl
   .local text_user_list_foot
-  .byte '[p] previous  [n] next  [7] Exit'
+  .byte '[p] previous  [n] next  [OPT] Exit'
   .endl
   
   
@@ -1332,7 +1356,7 @@ version_date .byte '10/2024',128
   .byte 'Example: www.chat64.nl'  
   .endl
 
-  .local text_server_setup
+  .local text_account_setup
   .byte 'ACCOUNT SETUP'
   .endl
   
@@ -1379,17 +1403,23 @@ version_date .byte '10/2024',128
   .byte 'Use Ctrl-Return to send your message immediately',$9b
   .byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'
   .byte ' start your message with @username'
+
+  .endl
+  
+  .local text_help_screen2
   .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with @Eliza'
   .endl
   
   .local text_about_screen
   .byte 'ABOUT CHAT64',$9b,$9b
-  .byte 'Initially developed by Bart as a proof of concept on Commodore 64',$9B,$9B
-  .byte 'A new version of CHAT64 is now available to everyone.',$9B
+  .byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B
+  .byte 'A new version of CHAT64 is now availableto everyone.',$9B
   .byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B
-  .byte 'Made by Bart Venneker and Theo  van den Belt in 2024',$9B,$9B
-  .byte 'Hardware, software and manuals  are available on Github',$9B
-  .byte 'github.com/bvenneker/Chat64-for-Atari800'
+  .endl  
+  .local text_about_screen2
+  .byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B
+  .byte 'Hardware, software and manuals are available on Github',$9B,$9B
+  .byte 'github.com/bvenneker/Chat64-Atari800'
   .endl  
   
   .local text_madeBy 
@@ -1443,6 +1473,7 @@ VICEMODE .byte 0
 CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
+TEMPI .byte 0
         
  run init
   
