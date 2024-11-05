@@ -1,8 +1,5 @@
 // special characters: https://www.youtube.com/watch?v=fOrMwNBoC7E&list=PLmzSn5Wy9uF8nTsZBtdk1yHzFI5JXoUJT&index=7
 
-// geheugen toevoegen aan 600XL: https://www.youtube.com/watch?v=jyWtzC96kZo
-
-
 // https://www.atarimax.com/jindroush.atari.org/acarts.html
 // https://atariwiki.org/wiki/Wiki.jsp?page=Cartridges
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
@@ -101,8 +98,8 @@ get_status:
   cmp #1
   beq exit_gs
 
-  lda #236                                    // ask Cartridge for the wifi credentials
-  jsr send_start_byte_ff                      // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
+  lda #236                                      // ask Cartridge for the wifi credentials
+  jsr send_start_byte_ff                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
   
   lda #1                                        // set the variables up for the splitbuffer command
   sta splitIndex                                // we need the first element, so store #1 in splitIndex
@@ -152,8 +149,7 @@ exit_gs
 // ----------------------------------------------------------------------
 main_menu:
   mva #10 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0    ; draw the divider line
   displayText text_main_menu, #1,#15    ; draw the menu title
   displayText divider_line, #2,#0    ; draw the divider line
@@ -173,18 +169,35 @@ main_menu_key_input:
   cmp #255
   beq main_menu_key_input
   
-  cmp #$37                            // key 7 is pressed
+  cmp #$37                            // key 7 is pressed(exit)
   beq exit_main_menu
   
-  cmp #$31                            // key 1 is pressed
+  cmp #$31                            // key 1 is pressed (wifi)
   bne cp_2 
   jmp wifi_setup
 cp_2
-  cmp #$32
+  cmp #$32                            // key 2 is pressed (server setup)
   bne cp_3
   jmp server_setup
 cp_3
-  mva #255 $2fc                       ; clear keyboard buffer 
+  cmp #$33                            // key 3 is pressed (account)
+  bne cp_4
+  jmp account_setup
+cp_4
+  cmp #$34                            // key 4 is pressed (user list)
+  bne cp_5
+  jmp user_list                    
+cp_5
+  cmp #$35                            // key 5 is pressed (about)
+  bne cp_6
+  jmp about_screen
+cp_6
+  cmp #$36                            // key 6 is pressed (help)
+  bne no_match
+  jmp help_screen
+  
+no_match  
+  mva #255 $2fc                       // clear keyboard buffer 
   jmp main_menu_key_input
   
 exit_main_menu
@@ -202,14 +215,205 @@ restore_chat_screen:
   jsr writeText  ; print it to screen
   jmp main_chat_screen
 
+
+// ----------------------------------------------------------------------
+// Clear the keyboardbuffer and also clear the screen
+// ----------------------------------------------------------------------
+clear_keyboard_and_screen
+  mva #255 $2fc                               // clear keyboard buffer
+  mva #12 MENU_ID
+  lda #$7D                                    // load clear screen command
+  jsr writeText                               // print it to screen
+  rts
+
+// ----------------------------------------------------------------------
+// About screen
+// ----------------------------------------------------------------------
+about_screen:
+  mva #15 MENU_ID
+  jsr clear_keyboard_and_screen
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText text_about_screen, #1,#15       // draw the menu title and text
+  displayText text_about_screen2, #10,#0       // draw the more text
+  
+  displayText divider_line, #22,#0            // draw the divider line
+  displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
+  jmp help_get_key_input                      // wait for user to press 7 to exit
+// ----------------------------------------------------------------------
+// Help screen
+// ----------------------------------------------------------------------
+help_screen:                                  //
+  mva #16 MENU_ID                             //
+  jsr clear_keyboard_and_screen               //
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_help_screen, #1,#15        // draw the menu title and text
+  displayText text_help_screen2, #10,#0        // draw more text
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText divider_line, #22,#0            // draw the divider line
+  displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
+                                              //
+help_get_key_input                            //
+  jsr getKey                                  // wait for a key
+  cmp #251
+  beq hlp_exit
+  cmp #$37                                    // key 7 is pressed
+  bne help_get_key_input                      // if not, wait for key again
+hlp_exit
+  mva #255 $2fc                               // clear keyboard buffer 
+  jmp main_menu                               // exit to main menu
+
+  
+  
+// ----------------------------------------------------------------------
+// User list screen
+// send byte 234 to reset the page number to 0 and get the first group of 20 users
+// send byte 233 to get the next group of 20 users
+// so we have 40 users on screen.
+// at this point we support a max of 120 users per chat server.
+// ----------------------------------------------------------------------
+user_list:
+  mva #14 MENU_ID
+  mva #234 TEMPI
+ul_start
+  jsr clear_keyboard_and_screen
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_user_list, #1,#15          // draw the menu title
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText divider_line, #22,#0            // draw the divider line
+  displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
+  lda VICEMODE
+  cmp #1
+  beq ul_vice 
+
+
+  lda TEMPI
+  jsr send_start_byte_ff                      // RXBUFFER now contains the first group of users, 20
+  displayBuffer RXBUFFER,#3 ,#0
+
+  lda #233
+  jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
+  displayBuffer RXBUFFER,#14 ,#0
+
+  
+  
+ul_vice
+ul_get_key_input  
+  jsr getKey
+  //cmp #$37                                  // key 7 is pressed(exit)
+  cmp #251                                    // OPTION key is pressed
+  beq ul_exit_main_menu
+  cmp #$6E                                    // key 'n' is pressed
+  beq ul_next
+  cmp #$70                                    // key 'p' is pressed
+  beq ul_prev  
+  jmp ul_get_key_input
+
+ul_next
+  mva #233 TEMPI
+  jmp ul_start
+  
+ul_prev
+  jmp user_list
+  
+ul_exit_main_menu
+  jmp main_menu
+
+// ----------------------------------------------------------------------
+// Account_setup screen
+// ----------------------------------------------------------------------
+account_setup:
+  mva #13 MENU_ID
+  jsr clear_keyboard_and_screen
+  displayText divider_line, #0,#0             // draw the divider line
+  displayText text_account_setup, #1,#15      // draw the menu title
+  displayText divider_line, #2,#0             // draw the divider line
+  displayText text_account_1, #5,#1
+  displayText divider_line, #11,#0            // draw the divider line
+  displayText text_option_exit, #15,#3
+  displayText divider_line, #22,#0            // draw the divider line
+  
+  lda VICEMODE
+  cmp #1
+  beq acc_vice      
+
+  lda #243                                    // ask for the mac address, registration id, nickname and regstatus
+  jsr send_start_byte_ff                      //
+  displayBuffer  RXBUFFER,#23 ,#3             // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128)
+  mva #1 splitIndex                           //
+  jsr splitRXbuffer                           //
+  displayBuffer  SPLITBUFFER,#5 ,#13          // Display the buffers on screen (Mac address)
+  mva #2 splitIndex                           //
+  jsr splitRXbuffer                           //
+  displayBuffer  SPLITBUFFER,#7 ,#13          // Display the buffers on screen (registration id)
+  mva #3 splitIndex                           //
+  jsr splitRXbuffer                           //
+  displayBuffer  SPLITBUFFER,#9 ,#25          // Display the buffers on screen (Nick Name)
+                                              //
+acc_vice                                      //
+acc_input_fields                              //
+  mva #0 curinh                               // Show the cursor 
+  mva #7 rowcrs                               // Put the cursor in the registration id field
+  mva #17 colcrs                              //
+  mva #19 FIELD_MIN                           //
+  mva #35 FIELD_MAX                           //
+  lda #32                                     //
+  jsr writeText                               //
+  jsr text_input                              //
+
+  mva #255 $2fc                               // Clear keyboard buffer
+  mva #9 rowcrs                               // Put the cursor in the Nick Name field
+  mva #11 colcrs                              //
+  mva #13 FIELD_MIN                           //
+  mva #21 FIELD_MAX                           //
+  lda #32                                     //
+  jsr writeText                               //
+  jsr text_input                              //
+
+  mva #1 curinh                               // Hide the cursor
+  lda #$1E                                    // step cursor left
+  jsr writeText                               // now it becomes invisible   
+  
+  displayText text_start_save_settings, #13,#3
+account_setup_key_input:
+  jsr getKey
+  cmp #255
+  beq account_setup_key_input 
+  cmp #251                                    // OPTION is pressed
+  beq exit_to_main_menus
+  cmp #253                                    // START is pressed
+  beq account_save_settings
+  mva #255 $2fc                               // clear keyboard buffer 
+  jmp account_setup_key_input
+  
+exit_to_main_menus
+  mva #255 $2fc                               // clear keyboard buffer 
+  jmp main_menu
+
+account_save_settings
+  displayText text_save_settings, #23, #3
+  jsr wait_for_RTR
+  lda #246
+  sta $D502
+  mva #5 temp_i                               // Read servername and send it to cartridge
+  mva #14 temp_i+1
+  mva #25 input_fld_len
+  jsr read_field
+
+  mva #255 DELAY
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay  
+  jsr get_status 
+  jmp account_setup
+
 // ----------------------------------------------------------------------
 // Server setup screen
 // ----------------------------------------------------------------------
 server_setup:  
-  mva #255 $2fc                               // clear keyboard buffer
   mva #12 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
   displayText text_server_setup, #1,#15       // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
@@ -237,18 +441,19 @@ svr_input_fields                              //
   jsr writeText                               // now it becomes invisible   
 
   displayText text_start_save_settings, #13,#3
+  
 server_setup_key_input:
   jsr getKey
   cmp #255
   beq server_setup_key_input 
   cmp #251                                    // OPTION is pressed
-  beq exit_to_main_menus
+  beq srv_exit_to_main_menu
   cmp #253                                    // START is pressed
   beq server_save_settings
   mva #255 $2fc                               // clear keyboard buffer 
   jmp server_setup_key_input
   
-exit_to_main_menus
+srv_exit_to_main_menu
   mva #255 $2fc                               // clear keyboard buffer 
   jmp main_menu
 
@@ -270,14 +475,13 @@ server_save_settings
   jsr jdelay  
   jsr get_status 
   jmp server_setup
+  
 // ----------------------------------------------------------------------
 // Wifi setup screen
 // ----------------------------------------------------------------------
 wifi_setup:  
-  mva #255 $2fc                               // clear keyboard buffer
-  mva #11 MENU_ID
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  mva #12 MENU_ID
+  jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
   displayText text_wifi_setup, #1,#15         // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
@@ -293,10 +497,8 @@ wifi_get_cred
   lda #248                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff
   displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the wifi status
-
   lda #251                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff                      // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
-  
   mva #1 splitIndex                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#9           // Display the buffers on screen (SSID name)
@@ -372,12 +574,10 @@ wifi_save_settings
   mva #9 temp_i+1                             // temp_i (2 bytes) holds the row and column of the field
   mva #27 input_fld_len                       // input_fld_len is the length of the field
   jsr read_field                              // jump to the read_field sub routine
-
   mva #7 temp_i                               // Read password and send it to cartridge
   mva #13 temp_i+1
   mva #23 input_fld_len
   jsr read_field
-
   mva #9 temp_i                               // Read password and send it to cartridge
   mva #25 temp_i+1
   mva #10 input_fld_len
@@ -395,25 +595,25 @@ wifi_save_settings
 // input row and column in temp_i and temp_i+1
 // ---------------------------------------------------------------------
 read_field:
-  lda sm_prt      // reset the input field pointer
-  sta input_fld   // reset the input field pointer
-  lda sm_prt+1    // reset the input field pointer
-  sta input_fld+1 // reset the input field pointer
-  jsr open_field  // get a pointer to the start adres of the field
+  lda sm_prt          // reset the input field pointer
+  sta input_fld       // reset the input field pointer
+  lda sm_prt+1        // reset the input field pointer
+  sta input_fld+1     // reset the input field pointer
+  jsr open_field      // get a pointer to the start adres of the field
   ldy #0
-loopr                //
-  cpy input_fld_len  // compare y (our index) with the field length
-  beq loopr_exit     // if we reach the end of the field, exit
-  lda (input_fld),y  // read the field with index y
-  jsr wait_for_RTR   // wait for ready to receive on the cartridge
-  sta $D502          // write the data to the cartridge
-  iny                // increase our index
-  jmp loopr          // loop to read the next character
-loopr_exit           //
-  jsr wait_for_RTR   // after the field data has been send, we need
-  lda #128           // to close the transmission with byte 128
-  sta $D502          // send 128 to the cartridge
-  rts                // return
+loopr                 //
+  cpy input_fld_len   // compare y (our index) with the field length
+  beq loopr_exit      // if we reach the end of the field, exit
+  lda (input_fld),y   // read the field with index y
+  jsr wait_for_RTR    // wait for ready to receive on the cartridge
+  sta $D502           // write the data to the cartridge
+  iny                 // increase our index
+  jmp loopr           // loop to read the next character
+loopr_exit            //
+  jsr wait_for_RTR    // after the field data has been send, we need
+  lda #128            // to close the transmission with byte 128
+  sta $D502           // send 128 to the cartridge
+  rts                 // return
 
 // ---------------------------------------------------------------------
 // Open a field to read                  
@@ -484,7 +684,7 @@ check_matrix                                      //
 exit_sim_check                                    // 
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
-  jsr jdelay                                     // and call the delay subroutine
+  jsr jdelay                                      // and call the delay subroutine
   rts    
     
 // ---------------------------------------------------------------------
@@ -538,7 +738,7 @@ wait_for_RTS:
 // procedure for text input
 // ----------------------------------------------------------------------
 text_input:
-  mva #0 curinh     // show the cursor 
+  mva #0 curinh                        // show the cursor 
 key_loop
   //jsr blinkCursor
   jsr getKey
@@ -548,7 +748,7 @@ key_loop
 cpoption
   cmp #251
   bne cpdelete
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                       // clear keyboard buffer 
   jmp main_menu
   
 cpdelete  
@@ -560,9 +760,9 @@ cpreturn
   bne cp_up 
   jmp handle_return
 
-// cpCursorKeys  
+ 
 
-cp_up
+cp_up                               // check the cursor keys up down left right
   cmp #142     
   bne cp_down 
   jmp handle_up
@@ -579,7 +779,7 @@ cp_right
   bne chrout
   jmp handle_right
 
-chrout
+chrout                               // output the key to screen
   pha
   lda MENU_ID
   cmp #10
@@ -588,7 +788,7 @@ out_ok
   pla  
   jsr writeText
 out_exit
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                      // clear keyboard buffer 
   jmp key_loop
 in_field  
   lda colcrs
@@ -873,7 +1073,7 @@ cl_exit
 //  <X>,<Y> will be destroyed 
 // ----------------------------------------------------------------------
 kb2asci: 
-    // see https://www.atariarchives.org/c3ba/page004.php
+// see https://www.atariarchives.org/c3ba/page004.php
 //       0   1   2  3 4  5   6   7   8  9 10   11 12  13  14  15  16 17 18  19 20 21  22  23  24  25  26  27 28  29  30
   .byte 'l','j',';',3,4,'k','+','*','o',9,'p','u',13,'i','-','=','v',17,'c',19,20,'b','x','z','4',25,'3','6',28,'5','2'
 //          31  32   33  34  35 36 37  38  39 40  41  42  43  44  45 46  47  48  49  50  51 52  53  54  55  56  57  58 59 60
@@ -892,49 +1092,11 @@ kb2asci:
   .byte     211,212,213,214,215,'$',217,'#','&',220,'%','"','!','[',225,']','N',228,'M','?',231,'R',233,'E','Y',236,'T','W','Q','('
 //          241 242 243 244 245 246 247 248 249 250 251 252 253 254 255
   .byte     241,')' ,96,  8,'@',246,247,'F','H','D',251, 60,'G','S','A'
-  //   3 = f1
-  //   4 = f2
-  //   8 = backspace
-  //   9 = tab
-  //  13 = return
-  //  17 = HELP
-  //  19 = F3
-  //  20 = F4
-  //  28 = ESCAPE
-  //  39 = logo key
-  //  44 = TAB
-  //  52 = Delete
-  //  60 = caps/lowr
-  //  67 = Shift F1 is now 3 (normal F1)
-  //  68 = shift F2 
-  //  76 = shift Return
-  //  81 = shift HELP
-  //  83 = Shift F3
-  //  84 = Shift F4
-  //  92 = Shift Escape. is now 28 (normal escape)
-  // 103 = shift logo key, is nu 39 (normal logo)
-  // 108 = shift TAB
-  // 116 = shift delete  
-  // 118 = clear
-  // 119 = insert
-  // 124 = shift caps/lowr
-  // 131 = Control F1 is now 3 (normal F1)
-  // 132 = Control F2 is now 4 (normal F2)
-  // 134 = LEFT
-  // 135 = RIGHT
-  // 140 = Control Return is now 76 (shift return)
-  // 142 = UP
-  // 143 = DOWN
-  // 145 = Control HELP, is now 17 (normal help)
-  // 147 = Control F3, is now 19 (normal f3)
-  // 148 = Control F4, is now 20 (normal f4)
-  // 156 = Control ESC, is nu 28 (normal escape)
-  // 167 = Control Logo, is nu 39 (normal logo)
-  // 204 = shift control Return, is now 76 (shift return)
+
 
 getKey:   
   jsr readRTS                           // check for incomming data or reset request   
-  lda $D01F  // is one of the 'function keys' pressed?
+  lda $D01F                             // is one of the console keys pressed?
   and #7
   cmp #6
   beq prSTART
@@ -943,20 +1105,20 @@ getKey:
   cmp #3
   beq prOPTION
   
-  lda $02DC  // is the HELP key pressed ?
+  lda $02DC                             // is the HELP key pressed ?
   and #1
   cmp #1
   beq prHELP
   
-  lda $2FC  // is there a key in the keyboard buffer?
-  cmp #255
-  beq exit_getkey
+  lda $2FC                              // is there a key in the keyboard buffer?
+  cmp #255                              // 255 means no key
+  beq exit_getkey                       // exit if no key
 
-keyConvert
-  tay
-  lda kb2asci,y
-exit_getkey
-  rts
+keyConvert                              // convert the key code to ascii
+  tay                                   //
+  lda kb2asci,y                         //
+exit_getkey                             //
+  rts                                   //
   
 prOPTION
   // wait until the key is released
@@ -1140,7 +1302,7 @@ exitRTS
 // Reset the Atari
 // ----------------------------------------------------------------------
 resetAtari:  
-   jmp $E477      // jump to reboot vector to restart the Atari.
+   jmp $E477            // jump to reboot vector to restart the Atari.
 
   
 // ----------------------------------------------------------------
@@ -1149,6 +1311,14 @@ resetAtari:
 version .byte '3.77',128
 version_date .byte '10/2024',128
 
+  .local text_user_list
+  .byte 'USER LIST'
+  .endl
+  .local text_user_list_foot
+  .byte '[p] previous  [n] next  [OPT] Exit'
+  .endl
+  
+  
   .local text_no_cartridge
   .byte 'Cartridge Not Installed!'
   .endl
@@ -1171,7 +1341,6 @@ version_date .byte '10/2024',128
   .local text_start_save_settings
   .byte '[START]  Save Settings'
   .endl  
-
   
   .local text_main_menu
   .byte 'MAIN MENU'
@@ -1187,6 +1356,17 @@ version_date .byte '10/2024',128
   .byte 'Example: www.chat64.nl'  
   .endl
 
+  .local text_account_setup
+  .byte 'ACCOUNT SETUP'
+  .endl
+  
+  .local text_account_1
+  .byte 'MAC Address:'
+  .byte  $9b,$9b,' '
+  .byte 'Registration ID:'
+  .byte  $9b,$9b,' '
+  .byte 'Nick Name:'
+  .endl
   
   .local version_line
   .byte ' Version  ROM x.xx  ESP x.xx    10/2024'
@@ -1218,29 +1398,29 @@ version_date .byte '10/2024',128
   .byte '[7] Exit Menu'
   .endl
   
-  .local t1 
-  .byte 'Ontvangen: '
-  .endl
+  .local text_help_screen
+  .byte 'HELP',$9b,$9b
+  .byte 'Use Ctrl-Return to send your message immediately',$9b
+  .byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'
+  .byte ' start your message with @username'
 
-  .local t2
-  .byte '153'
-  .endl
-
-  .local t3 
-  .byte 'RTS = 0'
-  .endl
-
-  .local t4
-  .byte 'RTS = 1'
   .endl
   
-  .local t5 
-  .byte 'RTR = 0'
+  .local text_help_screen2
+  .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with @Eliza'
   .endl
-
-  .local t6
-  .byte 'RTR = 1'
-  .endl
+  
+  .local text_about_screen
+  .byte 'ABOUT CHAT64',$9b,$9b
+  .byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B
+  .byte 'A new version of CHAT64 is now availableto everyone.',$9B
+  .byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B
+  .endl  
+  .local text_about_screen2
+  .byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B
+  .byte 'Hardware, software and manuals are available on Github',$9B,$9B
+  .byte 'github.com/bvenneker/Chat64-Atari800'
+  .endl  
   
   .local text_madeBy 
   .byte 'Made by Bart and Theo in 2024'  
@@ -1293,8 +1473,7 @@ VICEMODE .byte 0
 CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
-
-       
+TEMPI .byte 0
         
  run init
   
