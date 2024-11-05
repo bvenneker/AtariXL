@@ -28,6 +28,7 @@ color4 = $2c8
 
 input_fld = $15        // input field address $15 + $16
 temp_i = $17 
+temp_o = $19
 input_fld_len = $1A    // length of the input field
 text_color = $36
 character = $3f 
@@ -1308,13 +1309,15 @@ ss_big_letters
   jmp ss_big_letters
   
 stars                       // draw the stars
-  
   ldx #0
   inc temp_i+1
   inc temp_i+1
-  lda #56//temp_i
-  //adc #160
+  lda #56
   sta temp_i
+  sta input_fld             // we need this later for animating the stars
+  sta TEMPB 
+  mva temp_i+1 input_fld+1  // we need this later for animating the stars
+  
   lda #15
 stars_lp
   ldy sc_stars1,x
@@ -1328,6 +1331,7 @@ stars_lp
 
 
 wkey2  
+  jsr animate_stars
   jsr readRTS                           // check for incomming data or reset request
   lda $02FC                             // wait for any key
   cmp #255                              // see if last key equals zero
@@ -1335,6 +1339,122 @@ wkey2
   mwa temppos CHARSET
   rts
 
+animate_stars
+   
+  mwa sm_prt temp_i
+  jsr shift_line_to_left
+  lda temp_i
+  adc #39
+  sta temp_i
+  jsr shift_line_to_left
+  lda temp_i
+  adc #39
+  sta temp_i
+  jsr shift_line_to_left
+  lda temp_i
+  adc #39
+  sta temp_i
+  jsr shift_line_to_left
+  lda temp_i
+  adc #39
+  sta temp_i
+  jsr shift_line_to_left
+  
+  lda TEMPB
+  sta input_fld
+  jsr shift_line_to_right  
+  lda input_fld
+  adc #39
+  sta input_fld
+  jsr shift_line_to_right
+  
+    lda input_fld
+  adc #39
+  sta input_fld
+  jsr shift_line_to_right
+    lda input_fld
+  adc #39
+  sta input_fld
+  jsr shift_line_to_right
+    lda input_fld
+  adc #39
+  sta input_fld
+  jsr shift_line_to_right
+  
+  lda #40
+  sta DELAY
+  jsr jdelay
+  
+  
+  rts
+  
+//=========================================================================================================
+//  SUB ROUTINE TO SHIFT THE COLORS IN THE STAR LINES TO LEFT
+//=========================================================================================================
+shift_line_to_left:                               // a pointer to the color memory address where the line we want to shift starts
+                                                  // is stored in zero page address temp_i, temp_i+1
+    ldy #0                                        // before we start the loop we need to store the color of the very first character
+    lda (temp_i),y                                // so load the color on the first position of the line
+    pha                                           // push it to the stack, for later use
+    iny                                           // y is our index for the loop, it starts at 1 this time.
+                                                  // 
+shift_l_loop:                                     // start the loop
+                                                  // the loop works like this:
+    lda (temp_i),y                                // 1) load the color of character at postion y in the accumulator
+    dey                                           // 2) decrease y
+    sta (temp_i),y                                // 3) store the color on position y. So now the color of character has shifted left
+    cpy #39                                       // 4) see if we are at the end of the line
+    beq shift_l_exit                              // and exit if we are
+    iny                                           // 5) if not, increase y
+    iny                                           // twice (because we decreased it in step 2
+    jmp shift_l_loop                              // 6) back to step 1
+                                                  // 
+shift_l_exit                                      // here we exit the loop
+                                                  // 
+    pla                                           // 7) we need to store the color of the very first character (the most left)
+    sta (temp_i),y                                // on the most right position, so the line goes round and round
+    rts                                           // now the colors in this line have shifted 1 position to the left
+                                                  // 
+//=========================================================================================================
+//  SUB ROUTINE TO SHIFT THE STAR LINES TO RIGHT
+//=========================================================================================================
+COLOR .byte 0
+TEMPB .byte 0
+shift_line_to_right:                       // a pointer to the color memory address where the line we want to shift starts
+                                                  // is stored in zero page address $f7, $f8
+                                                  // shifting a line to the right is a bit more complicated as to shifting to the left.
+                                                  // to better explain we have this line as example ABCDEFGH
+                                                  // remember that we are only shifting the colors,not the characters
+                                                  // 
+    ldy #0                                        // start at postion zero (A in our line)
+    lda (input_fld),y                             // read the characters color (the zero page address $f7,$f8
+    sta temp_o                                       // store it temporary in memory address $fe, so now A is stored in $fe
+                                                  // 
+shift_r_loop:                                            // 
+    iny                                           // increase our index, y
+    lda (input_fld),y                             // read the color at the next postion (B in our line of data)
+    sta COLOR                                     // store color B temporary in memory address $ff, so now B is stored in $ff
+    lda temp_o                                       // now load $fe (that contains A) back into the accumulator
+    sta (input_fld),y                                   // and store it where B was. The Data line looks like this now AACDEFGH (A has shifted to the right and B is in temporary storage at $ff)
+    iny                                           // increase y again
+    lda (input_fld),y                                   // Read the color on the next position (C in our line of data)
+    sta temp_o                                       // Store it it temporary in memory address $fe, so now B is stored in $fe
+    lda COLOR                                     // now load $ff (that contains B) back into the accumulator
+    sta (input_fld),y                                   // and put that where C was. The data line now look like this: AABDEFGH (A and B have shifted and C is in temporary storage at $fe)
+    cpy #38                                       // see if we are at the end of the line 
+    bne shift_r_loop                                    // if not, jump back to the start of the loop
+                                                  // after the loop we have processed 39 positions, but the line is 40 long
+                                                  // At this point G is in memory storage $fe and H is in storage at $ff
+    iny                                           // increase y
+    lda temp_o                                       // load G
+    sta (input_fld),y                                   // put it in position H
+                                                  // 
+                                                  // NOW the data looks like this: AABCDEFG (all colors have shifted except for H which is in storeage at $fe)
+    ldy #0                                        // set the index back to zero
+    lda COLOR                                     // load color H into the accumulator
+    sta (input_fld),y                             // and store it at the first position.
+    rts                                           // Now our line looks like this: HABCDEFG all colors have shifted to the right one position.
+                                                  // 
 // ----------------------------------------------------------------------
 // displayBuffer, used in macro displayRXBuffer
 // ----------------------------------------------------------------------
@@ -1408,7 +1528,7 @@ version .byte '3.77',128
 version_date .byte '10/2024',128
 
 sc_stars1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
-sc_stars2 .byte 6,45,46,47,86, 30,70,69,71,110, 93,132,133,134,173, 78,117,118,119,158,255  
+sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255  
  
 
   .local text_user_list
