@@ -19,8 +19,8 @@ COLPF2    = $d018
 COLPF3    = $d019
 COLOR0    = $02c4
 SDLSTL    = $0230
-
-
+CHARSET   = $2F4
+ROM_CHARS = $E000 
 POKEY  = $D200
  
 color2 = $2c6
@@ -55,9 +55,9 @@ init
   adc #3                 ; add 3
   sta inputfield+1       ; store in $44.
   
-//  lda #0  
-//  sta color4
-//  sta color2
+  lda #0  
+  sta color4
+  sta color2
   sta character  
   sta MENU_ID
   sta SCREEN_ID
@@ -66,9 +66,8 @@ init
   lda sm_prt+1
   sta input_fld+1
 
-  
 main 
-  jsr startScreen2
+  jsr startScreen
   mva #1 curinh
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
@@ -221,7 +220,6 @@ restore_chat_screen:
 // ----------------------------------------------------------------------
 clear_keyboard_and_screen
   mva #255 $2fc                               // clear keyboard buffer
-  mva #12 MENU_ID
   lda #$7D                                    // load clear screen command
   jsr writeText                               // print it to screen
   rts
@@ -760,8 +758,6 @@ cpreturn
   bne cp_up 
   jmp handle_return
 
- 
-
 cp_up                               // check the cursor keys up down left right
   cmp #142     
   bne cp_down 
@@ -776,14 +772,29 @@ cp_left
   jmp handle_left
 cp_right
   cmp #135
-  bne chrout
+  bne check_end_pos
   jmp handle_right
 
+check_end_pos
+  pha
+  lda rowcrs
+  cmp #23
+  bne rp
+  lda colcrs
+  cmp #39
+  bne rp      
+  pla  
+  lda #$1E
+  jmp chrout
+rp pla
+  
+  
 chrout                               // output the key to screen
   pha
   lda MENU_ID
   cmp #10
   bcs in_field  
+  
 out_ok    
   pla  
   jsr writeText
@@ -799,7 +810,6 @@ in_field
   lda #$1E
   jsr writeText
   jmp out_exit  
-
 
 handle_delete
   lda MENU_ID
@@ -849,6 +859,9 @@ handle_return
   lda MENU_ID
   cmp #10
   bcs exit_on_return 
+  lda rowcrs                          // ignore this key if we are on the last line
+  cmp #23
+  beq up_exit 
   lda #$9b
   jmp chrout
 exit_on_return 
@@ -1187,103 +1200,140 @@ sp_exit:                                            //
 // data for big letters on the start screen
 sc_big_text:                                 
 	.byte 0,0,0,0,0,0,0,0
-	.byte 81,91,91,69,124,0,0,124
-	.byte 81,91,91,69,82,87,82,0
-	.byte 81,91,91,69,124,0,0,0
+	.byte 3,5,5,2,10,0,0,10
+	.byte 3,5,5,2,11,87,11,0
+	.byte 3,5,5,2,10,0,0,0
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
-	.byte 125,0,0,0,124,0,0,124
-	.byte 124,0,0,124,0,124,0,0
-	.byte 125,0,0,0,124,0,0,124
+	.byte 7,0,0,0,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 7,0,0,0,10,0,0,10
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
-	.byte 125,0,0,0,65,82,82,68
-	.byte 65,82,82,68,0,124,0,0
-	.byte 125,91,91,69,90,82,82,68
+	.byte 7,0,0,0,65,11,11,68
+	.byte 65,11,11,68,0,10,0,0
+	.byte 7,5,5,2,4,11,11,68
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
-	.byte 125,0,0,0,124,0,0,124
-	.byte 124,0,0,124,0,124,0,0
-	.byte 125,0,0,124,0,0,0,124
+	.byte 7,0,0,0,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 7,0,0,10,0,0,0,10
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
-	.byte 90,123,123,67,124,0,0,124
-	.byte 124,0,0,124,0,124,0,0
-	.byte 90,123,123,67,0,0,0,124
+	.byte 4,6,6,1,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 4,6,6,1,0,0,0,10
 	.byte 0,0,0,0,0,0,0,0
 	.byte 255 
 	   
+custom_chars:             
+  .byte 0,0,0,0,0,0,0,0                // #0  space
+  .byte 24,24,56,240,224,0,0,0         // #1  arc 1 
+  .byte 0,0,0,224,240,56,24,24         // #2  arc 2
+  .byte 0,0,0,7,15,28,24,24            // #3  arc 3
+  .byte 24,24,28,15,7,0,0,0            // #4  arc 4
+  .byte 0,255,255,0,0,0,0,0            // #5  high line
+  .byte 0,0,0,0,0,255,255,0            // #6  low line
+  .byte 48,48,48,48,48,48,48,48        // #7  line left
+  .byte 0,0,0,0,255,255,255,255        // #8  line bottom
+  .byte 255,255,255,255,0,0,0,0        // #9  line top
+  .byte 24,24,24,24,24,24,24,24        // #10 line mid vertical
+  .byte 0,0,0,255,255,0,0,0            // #11 line mid horizontal
+  .byte 0,0,0,255,255,24,24,24         // #12 T 
+  .byte 24,24,24,31,31,24,24,24        // #13 T to right
+  .byte 24,24,24,248,248,24,24,24      // #14 T to left
+  .byte 170,127,222,117,234,119,234,85 // #15 stardust
+
              
-startScreen2:
+startScreen:
   jsr clear_keyboard_and_screen
-  lda sm_prt
-  sta temp_i
+  displayText text_forAtari800xl, #14,#12
+  displayText text_madeBy, #16,#5
+  mwa CHARSET temppos                  // make a backup of the pointer to the character set
+  mva #1 curinh
+  ldx #0
+cp_char_loop                           // copy charactre set
+  mva ROM_CHARS,x PUB_BACKUP,x
+  mva ROM_CHARS+$100,x PUB_BACKUP+$100,x
+  mva ROM_CHARS+$200,x PUB_BACKUP+$200,x
+  mva ROM_CHARS+$300,x PUB_BACKUP+$300,x
+  inx
+  bne cp_char_loop 
+  
+
+  // copy custom chars
+  ldx #0
+cust_loop  
+  mva  custom_chars,x  PUB_BACKUP,x
+  inx
+  cpx #128
+  bne cust_loop
+  mva #>PUB_BACKUP CHARSET  // set the char pointer to the new location
+  lda sm_prt                // create a pointer to the start of the screen
+  sta temp_i                // and to the end of the screen
   lda sm_prt+1
   sta temp_i+1
   inc temp_i+1
   inc temp_i+1
   inc temp_i+1  
   lda #16
-  
   sta temp_i
-  ldy #239
+  
+  ldy #239                 // draw the main strips 
 ss2
   lda #85 
   sta (temp_i),y
   lda #213 
   sta (sm_prt),y
-  
   dey
   cpy #255
   bne ss2
 
-  lda sm_prt
-  sta temp_i
+  lda sm_prt               // make a new pointer that points to the 
+  sta temp_i               // start line of the big letters
   sta temp_i
   lda sm_prt+1
   sta temp_i+1
   inc temp_i+1
   lda #128
   sta temp_i
-  ldy #0
+   
+  ldy #0                    // draw the big letters
 ss_big_letters
   lda sc_big_text,y
   cmp #255
-  beq wkey2
+  beq stars 
   sta (temp_i),y
   iny
   jmp ss_big_letters
+  
+stars                       // draw the stars
+  
+  ldx #0
+  inc temp_i+1
+  inc temp_i+1
+  lda #56//temp_i
+  //adc #160
+  sta temp_i
+  lda #15
+stars_lp
+  ldy sc_stars1,x
+  cpy #255
+  beq wkey2
+  sta (sm_prt),y
+  ldy sc_stars2,x  
+  sta (temp_i),y 
+  inx
+  jmp stars_lp
+
+
 wkey2  
   jsr readRTS                           // check for incomming data or reset request
   lda $02FC                             // wait for any key
   cmp #255                              // see if last key equals zero
   beq wkey2   
+  mwa temppos CHARSET
   rts
-
-startScreen:
-  mwa VDSLST dVDSLST   
-  ; load display list interrupt address
-  ldx #>dli
-  ldy #<dli
-  jsr init_dli
-                                        // store zero in last key pressed
-  mwa $230 ddlist                       // save the default display list
-  mwa #dl $230                          // set our own display list pointer
-                                        // the start screen is now displayed
-wkey1  
-  jsr readRTS                           // check for incomming data or reset request
-  lda $02FC                             // wait for any key
-  cmp #255                              // see if last key equals zero
-  beq wkey1                             //
-
-  mva #255 $02FC
-  mwa ddlist $230                       // restore the display list 
-  mwa dVDSLST VDSLST   
-  lda #0  
-  sta color4
-  sta color2
-  rts                                   // and return
-
 
 // ----------------------------------------------------------------------
 // displayBuffer, used in macro displayRXBuffer
@@ -1327,35 +1377,7 @@ writeText:
   txa
   rts
 
-init_dli
-        ; load display list interrupt address
-        sty VDSLST
-        stx VDSLST+1
 
-        ; activate display list interrupt
-        lda #NMIEN_VBI | NMIEN_DLI
-        sta NMIEN
-        rts
-
-dli     pha             ; save A & X registers to stack
-        txa
-        pha
-        ldx #16         ; make 16 color changes
-        lda start_color ; initial color
-        sta WSYNC       ; first WSYNC gets us to start of scan line we want
-?loop   sta COLPF0      ; change text color for UPPERCASE characters in gr2
-        clc
-        adc #$1         ; change color value, making brighter
-        dex             ; update iteration count
-        sta WSYNC       ; sta doesn't affect processor flags
-        bne ?loop       ; we are still checking result of dex
-        lda #text_color ; reset text color to normal color
-        sta COLPF0
-        dec start_color ; change starting color for next time
-        pla             ; restore X & A registers from stack
-        tax
-        pla
-        rti             ; always end DLI with RTI!
 
 // ----------------------------------------------------------------------
 // Check incomming data
@@ -1384,6 +1406,10 @@ resetAtari:
 // ----------------------------------------------------------------
 version .byte '3.77',128
 version_date .byte '10/2024',128
+
+sc_stars1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
+sc_stars2 .byte 6,45,46,47,86, 30,70,69,71,110, 93,132,133,134,173, 78,117,118,119,158,255  
+ 
 
   .local text_user_list
   .byte 'USER LIST'
@@ -1500,6 +1526,10 @@ version_date .byte '10/2024',128
   .byte 'Made by Bart and Theo in 2024'  
   .endl
   
+   .local text_forAtari800xl
+   .byte 'For Atari 800XL'
+   .endl
+   
   .local divider_line
   :40 .byte 18 ; 40 x byte 18
   .endl
@@ -1532,7 +1562,6 @@ version_date .byte '10/2024',128
 blink   .byte 0,0
 blink2  .byte 0,0
 ddlist  .word 0,0
-dVDSLST  .word 0,0
 DELAY  .byte 0,0    
 z_as .byte 0,0
 cursorphase  .byte 0,0
@@ -1548,6 +1577,10 @@ CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
 TEMPI .byte 0
+
+.align $400        
+PUB_BACKUP
+
         
  run init
   
