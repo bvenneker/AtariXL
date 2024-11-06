@@ -57,8 +57,8 @@ init
   sta inputfield+1       ; store in $44.
   
   lda #0  
-  sta color4
-  sta color2
+//  sta color4
+//  sta color2
   sta character  
   sta MENU_ID
   sta SCREEN_ID
@@ -75,22 +75,23 @@ main
   jsr are_we_in_the_matrix
   jsr get_status 
   jmp main_chat_screen
-
-
 // ----------------------------------------------------------------------
 // toggle between private and public messaging
 // ----------------------------------------------------------------------
 toggle_screens:
+  jsr backup_screen                // make a backup of the current screen
   lda SCREEN_ID
   cmp #3
-  bne private_message_screen
+  bne private_chat_screen
   jmp main_chat_screen
 
 // ----------------------------------------------------------------------
 // PRIVATE MESSAGING SCREEN
 // ----------------------------------------------------------------------
-private_message_screen:
+private_chat_screen:
   mva #3 SCREEN_ID
+  jmp restore_screen
+p_chat
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0    ; draw the divider line
   displayText text_F5_toggle, #1,#0    ; draw the menu title
@@ -100,9 +101,11 @@ private_message_screen:
 // ----------------------------------------------------------------------
 // PUBLIC MESSAGING SCREEN
 // ----------------------------------------------------------------------
-main_chat_screen:
-  jsr clear_keyboard_and_screen
+main_chat_screen:  
   mva #0 SCREEN_ID
+  jmp restore_screen
+m_chat
+  jsr clear_keyboard_and_screen
 chat_screen
   lda VICEMODE
   cmp #1  
@@ -113,9 +116,14 @@ mc_not_vice
   mva #255 $2fc                       ; clear keyboard buffer
   mva #0 colcrs                       ; set cursor row position to zero  
   displayText divider_line, #20,#0    ; draw the divider line
-  mva #0 curinh     // show the cursor
+  
   jsr clearInputLines
- 
+chat_key_input
+  mva #0 curinh     // show the cursor
+  lda #32
+  jsr writeText 
+  lda #$1E                                    // step cursor left
+  jsr writeText 
   jsr text_input    // jump to the text input routine
 
 // ----------------------------------------------------------------------
@@ -132,38 +140,133 @@ backup_screen:
   jmp backup_publ_screen
   rts
 
+backup_priv_screen
+  mva colcrs p_cursor_x
+  mva rowcrs p_cursor_y
+  mva #1 HAVE_P_BACKUP
+  mva #<SCREEN_PRIV_BACKUP temp_i
+  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  jsr backup_the_screen 
+  rts
+  
+backup_publ_screen
+  mva colcrs m_cursor_x
+  mva rowcrs m_cursor_y
+  mva #1 HAVE_M_BACKUP  
+  mva #<SCREEN_PUBL_BACKUP temp_i
+  mva #>SCREEN_PUBL_BACKUP temp_i+1
+  jsr backup_the_screen 
+  rts
+  
+backup_the_screen
+  mwa sm_prt textPointer    
+  ldy #0  
+backuploop1
+  lda (textPointer),y
+  sta (temp_i),y
+  iny
+  cpy #0
+  bne backuploop1
+   
+  inc textPointer+1
+  inc temp_i+1
+backuploop2
+  lda (textPointer),y
+  sta (temp_i),y
+  iny
+  cpy #0
+  bne backuploop2
+  
+  inc textPointer+1
+  inc temp_i+1
+backuploop3
+  lda (textPointer),y
+  sta (temp_i),y
+  iny
+  cpy #0
+  bne backuploop3
+  
+  inc textPointer+1
+  inc temp_i+1
+backuploop4
+  lda (textPointer),y
+  sta (temp_i),y
+  iny
+  cpy #192
+  bne backuploop4
+  rts
+  
+  
 restore_screen:
   lda SCREEN_ID
   cmp #3
   beq restore_priv_screen
   jmp restore_publ_screen  
-  rts
-
-backup_priv_screen
-  mva #1 HAVE_P_BACKUP
   
-  rts
-  
-backup_publ_screen
-  mva #1 HAVE_M_BACKUP
-  rts
-
 restore_priv_screen
   lda HAVE_P_BACKUP
   cmp #1
   beq do_p_restore
-  rts
+  jmp p_chat
 do_p_restore
-  rts
+  mva #<SCREEN_PRIV_BACKUP temp_i
+  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  jsr restore_the_screen 
+  mva p_cursor_x colcrs    // restore the cursor position
+  mva p_cursor_y rowcrs    // restore the cursor position
+  jmp chat_key_input
   
 restore_publ_screen
   lda HAVE_M_BACKUP
   cmp #1
   beq do_M_restore
-  rts
+  jmp m_chat
 do_M_restore
-  rts
+  mva #<SCREEN_PUBL_BACKUP temp_i
+  mva #>SCREEN_PUBL_BACKUP temp_i+1
+  jsr restore_the_screen 
+  mva m_cursor_x colcrs   // restore the cursor position
+  mva m_cursor_y rowcrs   // restore the cursor position
+  jmp chat_key_input
 
+restore_the_screen
+  mwa sm_prt textPointer
+  ldy #0  
+restoreloop1
+  lda (temp_i),y
+  sta (textPointer),y
+  iny
+  cpy #0
+  bne restoreloop1
+  
+  inc textPointer+1
+  inc temp_i+1
+restoreloop2
+  lda (temp_i),y
+  sta (textPointer),y
+  iny
+  cpy #0
+  bne restoreloop2
+
+  inc textPointer+1
+  inc temp_i+1
+restoreloop3
+  lda (temp_i),y
+  sta (textPointer),y
+  iny
+  cpy #0
+  bne restoreloop3
+
+  inc textPointer+1
+  inc temp_i+1
+restoreloop4
+  lda (temp_i),y
+  sta (textPointer),y
+  iny
+  cpy #192
+  bne restoreloop4
+  
+  rts
 // ----------------------------------------------------------------------
 // Get the config status and the ESP Version
 // ----------------------------------------------------------------------
@@ -277,17 +380,9 @@ no_match
 exit_main_menu
   lda #0
   sta MENU_ID
-  jmp restore_chat_screen
+  jmp restore_screen
+  
 
-
-// ----------------------------------------------------------------------
-// Backup and restore chat screen
-// ----------------------------------------------------------------------
-
-restore_chat_screen:
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
-  jmp main_chat_screen
 
 
 // ----------------------------------------------------------------------
@@ -828,6 +923,7 @@ cpoption
   cmp #251
   bne cpdelete
   mva #255 $2fc                       // clear keyboard buffer 
+  jsr backup_screen
   jmp main_menu
   
 cpdelete  
@@ -1774,15 +1870,10 @@ CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
 TEMPI .byte 0
-
-.align $400        
-SCREEN_PUBL_BACKUP
-
-  org SCREEN_PUBL_BACKUP + 1024
-SCREEN_PRIV_BACKUP
- 
-        
- run init
+p_cursor_x .byte 0
+p_cursor_y .byte 0
+m_cursor_x .byte 0
+m_cursor_y .byte 0
   
 // -----------------------------------
 // Print the RX Buffer on screen
@@ -1819,4 +1910,15 @@ SCREEN_PRIV_BACKUP
   jsr displayTextk  
 .endm  
 
+
+
+.align $400        
+SCREEN_PUBL_BACKUP:
+   
+
+  org SCREEN_PUBL_BACKUP + 1024
+SCREEN_PRIV_BACKUP:
+   
+        
+ run init
   
