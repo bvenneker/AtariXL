@@ -74,8 +74,36 @@ main
   jsr writeText  ; print it to screen
   jsr are_we_in_the_matrix
   jsr get_status 
+  jmp main_chat_screen
 
+
+// ----------------------------------------------------------------------
+// toggle between private and public messaging
+// ----------------------------------------------------------------------
+toggle_screens:
+  lda SCREEN_ID
+  cmp #3
+  bne private_message_screen
+  jmp main_chat_screen
+
+// ----------------------------------------------------------------------
+// PRIVATE MESSAGING SCREEN
+// ----------------------------------------------------------------------
+private_message_screen:
+  mva #3 SCREEN_ID
+  jsr clear_keyboard_and_screen
+  displayText divider_line, #0,#0    ; draw the divider line
+  displayText text_F5_toggle, #1,#0    ; draw the menu title
+  displayText divider_line, #2,#0    ; draw the divider line
+  jmp chat_screen
+
+// ----------------------------------------------------------------------
+// PUBLIC MESSAGING SCREEN
+// ----------------------------------------------------------------------
 main_chat_screen:
+  jsr clear_keyboard_and_screen
+  mva #0 SCREEN_ID
+chat_screen
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
@@ -744,6 +772,12 @@ key_loop
   cmp #255
   beq key_loop
 
+cpselect
+  cmp #252
+  bne cpoption
+  mva #255 $2fc                       // clear keyboard buffer 
+  jmp toggle_screens
+  
 cpoption
   cmp #251
   bne cpdelete
@@ -1168,84 +1202,36 @@ prHelp
 //    SUB ROUTINE TO SPLIT RXBUFFER
 //=========================================================================================================
 splitRXbuffer:                                   //
-                                                  // RXBUFFER now contains FOR EXAMPLE macaddress[129]regid[129]nickname[129]regstatus[128]
-    ldx #0                                        // load zero into x and y    
-    ldy #0                                        //   
-sp_read:                                            // read a byte from the index buffer   
-    lda RXBUFFER,x                                // copy that byte to the split buffer   
-    sta SPLITBUFFER,y                             // until we find byte 129   
-    cmp #129                                      //    
-    beq sp_n                                        //    
-    cmp #128                                      // or the end of line character   
-    beq sp_n                                        //    
-    inx                                           // increase the x index   
-    iny                                           // and also the y index   
-    jmp sp_read                                    // back to the start to get the next character   
-sp_n:                                                //    
-    lda #128                                      //     
-    sta SPLITBUFFER,y                             // load 128 (the end byte) into the splitbuffer   
-    dec splitIndex                                       // decrease $02. This address holds a number that indicates   
-    lda splitIndex                                       // which word we need from the RXBUFFER   
-    cmp #0                                        // so if $02 is equal to zero, we have the right word   
-    beq sp_exit                                    // exit in that case   
-    ldy #0                                        // if we need the next word   
-    inx                                           // we reset the y index,   
-    jmp sp_read                                    // increase the x index   
-                                                  // and get the next word from the RX buffer
-sp_exit:                                            // 
-    rts                                           // return.   
-                                                  // 
+                                                 // RXBUFFER now contains FOR EXAMPLE macaddress[129]regid[129]nickname[129]regstatus[128]
+    ldx #0                                       // load zero into x and y    
+    ldy #0                                       //   
+sp_read:                                         // read a byte from the index buffer   
+    lda RXBUFFER,x                               // copy that byte to the split buffer   
+    sta SPLITBUFFER,y                            // until we find byte 129   
+    cmp #129                                     //    
+    beq sp_n                                     //    
+    cmp #128                                     // or the end of line character   
+    beq sp_n                                     //    
+    inx                                          // increase the x index   
+    iny                                          // and also the y index   
+    jmp sp_read                                  // back to the start to get the next character   
+sp_n:                                            //    
+    lda #128                                     //     
+    sta SPLITBUFFER,y                            // load 128 (the end byte) into the splitbuffer   
+    dec splitIndex                               // decrease $02. This address holds a number that indicates   
+    lda splitIndex                               // which word we need from the RXBUFFER   
+    cmp #0                                       // so if $02 is equal to zero, we have the right word   
+    beq sp_exit                                  // exit in that case   
+    ldy #0                                       // if we need the next word   
+    inx                                          // we reset the y index,   
+    jmp sp_read                                  // increase the x index   
+                                                 // and get the next word from the RX buffer
+sp_exit:                                         // 
+    rts                                          // return.   
+                                                 // 
 // ----------------------------------------------------------------------
 // Start Screen
-// ----------------------------------------------------------------------
-// data for big letters on the start screen
-sc_big_text:                                 
-	.byte 0,0,0,0,0,0,0,0
-	.byte 3,5,5,2,10,0,0,10
-	.byte 3,5,5,2,11,87,11,0
-	.byte 3,5,5,2,10,0,0,0
-	.byte 0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0
-	.byte 7,0,0,0,10,0,0,10
-	.byte 10,0,0,10,0,10,0,0
-	.byte 7,0,0,0,10,0,0,10
-	.byte 0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0
-	.byte 7,0,0,0,65,11,11,68
-	.byte 65,11,11,68,0,10,0,0
-	.byte 7,5,5,2,4,11,11,68
-	.byte 0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0
-	.byte 7,0,0,0,10,0,0,10
-	.byte 10,0,0,10,0,10,0,0
-	.byte 7,0,0,10,0,0,0,10
-	.byte 0,0,0,0,0,0,0,0
-	.byte 0,0,0,0,0,0,0,0
-	.byte 4,6,6,1,10,0,0,10
-	.byte 10,0,0,10,0,10,0,0
-	.byte 4,6,6,1,0,0,0,10
-	.byte 0,0,0,0,0,0,0,0
-	.byte 255 
-	   
-custom_chars:             
-  .byte 0,0,0,0,0,0,0,0                // #0  space
-  .byte 24,24,56,240,224,0,0,0         // #1  arc 1 
-  .byte 0,0,0,224,240,56,24,24         // #2  arc 2
-  .byte 0,0,0,7,15,28,24,24            // #3  arc 3
-  .byte 24,24,28,15,7,0,0,0            // #4  arc 4
-  .byte 0,255,255,0,0,0,0,0            // #5  high line
-  .byte 0,0,0,0,0,255,255,0            // #6  low line
-  .byte 48,48,48,48,48,48,48,48        // #7  line left
-  .byte 0,0,0,0,255,255,255,255        // #8  line bottom
-  .byte 255,255,255,255,0,0,0,0        // #9  line top
-  .byte 24,24,24,24,24,24,24,24        // #10 line mid vertical
-  .byte 0,0,0,255,255,0,0,0            // #11 line mid horizontal
-  .byte 0,0,0,255,255,24,24,24         // #12 T 
-  .byte 24,24,24,31,31,24,24,24        // #13 T to right
-  .byte 24,24,24,248,248,24,24,24      // #14 T to left
-  .byte 170,127,222,117,234,119,234,85 // #15 stardust
-
-             
+// ----------------------------------------------------------------------            
 startScreen:
   jsr clear_keyboard_and_screen
   displayText text_forAtari800xl, #14,#12
@@ -1308,15 +1294,15 @@ ss_big_letters
   iny
   jmp ss_big_letters
   
-stars                       // draw the stars
+stars                         // draw the stars
   ldx #0
   inc temp_i+1
   inc temp_i+1
   lda #56
   sta temp_i
-  sta input_fld             // we need this later for animating the stars
+  sta textPointer             // we need this later for animating the stars
   sta TEMPB 
-  mva temp_i+1 input_fld+1  // we need this later for animating the stars
+  mva temp_i+1 textPointer+1  // we need this later for animating the stars
   
   lda #15
 stars_lp
@@ -1328,7 +1314,6 @@ stars_lp
   sta (temp_i),y 
   inx
   jmp stars_lp
-
 
 wkey2  
   jsr animate_stars
@@ -1361,48 +1346,46 @@ animate_stars
   jsr shift_line_to_left
   
   lda TEMPB
-  sta input_fld
+  sta textPointer
   jsr shift_line_to_right  
-  lda input_fld
+  lda textPointer
   adc #39
-  sta input_fld
+  sta textPointer
   jsr shift_line_to_right
-  
-    lda input_fld
+  lda textPointer
   adc #39
-  sta input_fld
+  sta textPointer
   jsr shift_line_to_right
-    lda input_fld
+  lda textPointer
   adc #39
-  sta input_fld
+  sta textPointer
   jsr shift_line_to_right
-    lda input_fld
+  lda textPointer
   adc #39
-  sta input_fld
+  sta textPointer
   jsr shift_line_to_right
   
   lda #40
   sta DELAY
   jsr jdelay
-  
-  
+
   rts
   
 //=========================================================================================================
 //  SUB ROUTINE TO SHIFT THE COLORS IN THE STAR LINES TO LEFT
 //=========================================================================================================
-shift_line_to_left:                               // a pointer to the color memory address where the line we want to shift starts
+shift_line_to_left:                               // a pointer to the screen memory address where the line we want to shift starts
                                                   // is stored in zero page address temp_i, temp_i+1
-    ldy #0                                        // before we start the loop we need to store the color of the very first character
-    lda (temp_i),y                                // so load the color on the first position of the line
+    ldy #0                                        // before we start the loop we need to store the very first character
+    lda (temp_i),y                                // so load the character on the first position of the line
     pha                                           // push it to the stack, for later use
     iny                                           // y is our index for the loop, it starts at 1 this time.
                                                   // 
 shift_l_loop:                                     // start the loop
                                                   // the loop works like this:
-    lda (temp_i),y                                // 1) load the color of character at postion y in the accumulator
+    lda (temp_i),y                                // 1) load the character at postion y in the accumulator
     dey                                           // 2) decrease y
-    sta (temp_i),y                                // 3) store the color on position y. So now the color of character has shifted left
+    sta (temp_i),y                                // 3) store the char on position y. So now the character has shifted left
     cpy #39                                       // 4) see if we are at the end of the line
     beq shift_l_exit                              // and exit if we are
     iny                                           // 5) if not, increase y
@@ -1411,49 +1394,48 @@ shift_l_loop:                                     // start the loop
                                                   // 
 shift_l_exit                                      // here we exit the loop
                                                   // 
-    pla                                           // 7) we need to store the color of the very first character (the most left)
+    pla                                           // 7) we need to store the very first character (the most left)
     sta (temp_i),y                                // on the most right position, so the line goes round and round
-    rts                                           // now the colors in this line have shifted 1 position to the left
+    rts                                           // now this line have shifted 1 position to the left
                                                   // 
 //=========================================================================================================
 //  SUB ROUTINE TO SHIFT THE STAR LINES TO RIGHT
 //=========================================================================================================
-COLOR .byte 0
+TempCharR .byte 0
 TEMPB .byte 0
-shift_line_to_right:                       // a pointer to the color memory address where the line we want to shift starts
-                                                  // is stored in zero page address $f7, $f8
+shift_line_to_right:                              // a pointer to the memory address where the line we want to shift starts
+                                                  // is stored in zero page address textPointer (2 bytes)
                                                   // shifting a line to the right is a bit more complicated as to shifting to the left.
                                                   // to better explain we have this line as example ABCDEFGH
-                                                  // remember that we are only shifting the colors,not the characters
                                                   // 
     ldy #0                                        // start at postion zero (A in our line)
-    lda (input_fld),y                             // read the characters color (the zero page address $f7,$f8
-    sta temp_o                                       // store it temporary in memory address $fe, so now A is stored in $fe
+    lda (textPointer),y                           // read the characters color (the zero page address $f7,$f8
+    sta temp_o                                    // store it temporary in memory address 'textPointer', so now A is stored in 'textPointer'
                                                   // 
-shift_r_loop:                                            // 
+shift_r_loop:                                     // 
     iny                                           // increase our index, y
-    lda (input_fld),y                             // read the color at the next postion (B in our line of data)
-    sta COLOR                                     // store color B temporary in memory address $ff, so now B is stored in $ff
-    lda temp_o                                       // now load $fe (that contains A) back into the accumulator
-    sta (input_fld),y                                   // and store it where B was. The Data line looks like this now AACDEFGH (A has shifted to the right and B is in temporary storage at $ff)
+    lda (textPointer),y                           // read the character at the next postion (B in our line of data)
+    sta TempCharR                                 // store color B temporary in memory address 'TempCharR', so now B is stored in 'TempCharR'
+    lda temp_o                                    // now load 'textPointer' (that contains A) back into the accumulator
+    sta (textPointer),y                           // and store it where B was. The Data line looks like this now AACDEFGH (A has shifted to the right and B is in temporary storage at $ff)
     iny                                           // increase y again
-    lda (input_fld),y                                   // Read the color on the next position (C in our line of data)
-    sta temp_o                                       // Store it it temporary in memory address $fe, so now B is stored in $fe
-    lda COLOR                                     // now load $ff (that contains B) back into the accumulator
-    sta (input_fld),y                                   // and put that where C was. The data line now look like this: AABDEFGH (A and B have shifted and C is in temporary storage at $fe)
+    lda (textPointer),y                           // Read the color on the next position (C in our line of data)
+    sta temp_o                                    // Store it it temporary in memory address textPointer, so now B is stored in textPointer
+    lda TempCharR                                 // now load TempCharR (that contains B) back into the accumulator
+    sta (textPointer),y                           // and put that where C was. The data line now look like this: AABDEFGH (A and B have shifted and C is in temporary storage at $fe)
     cpy #38                                       // see if we are at the end of the line 
-    bne shift_r_loop                                    // if not, jump back to the start of the loop
+    bne shift_r_loop                              // if not, jump back to the start of the loop
                                                   // after the loop we have processed 39 positions, but the line is 40 long
-                                                  // At this point G is in memory storage $fe and H is in storage at $ff
+                                                  // At this point G is in memory storage textPointer and H is in storage at TempCharR
     iny                                           // increase y
-    lda temp_o                                       // load G
-    sta (input_fld),y                                   // put it in position H
+    lda temp_o                                    // load G
+    sta (textPointer),y                           // put it in position H
                                                   // 
-                                                  // NOW the data looks like this: AABCDEFG (all colors have shifted except for H which is in storeage at $fe)
+                                                  // NOW the data looks like this: AABCDEFG (all characters have shifted except for H which is in storeage at textPointer)
     ldy #0                                        // set the index back to zero
-    lda COLOR                                     // load color H into the accumulator
-    sta (input_fld),y                             // and store it at the first position.
-    rts                                           // Now our line looks like this: HABCDEFG all colors have shifted to the right one position.
+    lda TempCharR                                 // load TempCharR (H) into the accumulator
+    sta (textPointer),y                           // and store it at the first position.
+    rts                                           // Now our line looks like this: HABCDEFG all characters have shifted to the right one position.
                                                   // 
 // ----------------------------------------------------------------------
 // displayBuffer, used in macro displayRXBuffer
@@ -1527,9 +1509,55 @@ resetAtari:
 version .byte '3.77',128
 version_date .byte '10/2024',128
 
+// data for big letters on the start screen
+sc_big_text:                                 
+	.byte 0,0,0,0,0,0,0,0
+	.byte 3,5,5,2,10,0,0,10
+	.byte 3,5,5,2,11,87,11,0
+	.byte 3,5,5,2,10,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 7,0,0,0,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 7,0,0,0,10,0,0,10
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 7,0,0,0,65,11,11,68
+	.byte 65,11,11,68,0,10,0,0
+	.byte 7,5,5,2,4,11,11,68
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 7,0,0,0,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 7,0,0,10,0,0,0,10
+	.byte 0,0,0,0,0,0,0,0
+	.byte 0,0,0,0,0,0,0,0
+	.byte 4,6,6,1,10,0,0,10
+	.byte 10,0,0,10,0,10,0,0
+	.byte 4,6,6,1,0,0,0,10
+	.byte 0,0,0,0,0,0,0,0
+	.byte 255 
+	   
+custom_chars:                          // custom chars for big letters and stars            
+  .byte 0,0,0,0,0,0,0,0                // #0  space
+  .byte 24,24,56,240,224,0,0,0         // #1  arc 1 
+  .byte 0,0,0,224,240,56,24,24         // #2  arc 2
+  .byte 0,0,0,7,15,28,24,24            // #3  arc 3
+  .byte 24,24,28,15,7,0,0,0            // #4  arc 4
+  .byte 0,255,255,0,0,0,0,0            // #5  high line horizontal
+  .byte 0,0,0,0,0,255,255,0            // #6  low line horizontal
+  .byte 48,48,48,48,48,48,48,48        // #7  line left vertical
+  .byte 0,0,0,0,255,255,255,255        // #8  line bottom horizontal
+  .byte 255,255,255,255,0,0,0,0        // #9  line top horizontal
+  .byte 24,24,24,24,24,24,24,24        // #10 line mid vertical
+  .byte 0,0,0,255,255,0,0,0            // #11 line mid horizontal
+  .byte 0,0,0,255,255,24,24,24         // #12 T 
+  .byte 24,24,24,31,31,24,24,24        // #13 T to right
+  .byte 24,24,24,248,248,24,24,24      // #14 T to left
+  .byte 170,127,222,117,234,119,234,85 // #15 stardust
+  
 sc_stars1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
 sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255  
- 
 
   .local text_user_list
   .byte 'USER LIST'
@@ -1538,6 +1566,9 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte '[p] previous  [n] next  [OPT] Exit'
   .endl
   
+  .local text_F5_toggle
+  .byte 'Private Messaging      [SEL] Main Chat'
+  .endl
   
   .local text_no_cartridge
   .byte 'Cartridge Not Installed!'
