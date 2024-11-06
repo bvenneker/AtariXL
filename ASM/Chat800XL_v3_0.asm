@@ -119,6 +119,52 @@ mc_not_vice
   jsr text_input    // jump to the text input routine
 
 // ----------------------------------------------------------------------
+// backup and restore screens
+// ----------------------------------------------------------------------
+HAVE_M_BACKUP:                .byte 0             // 
+HAVE_P_BACKUP:                .byte 0             //
+HAVE_ML_BACKUP:               .byte 0             //
+
+backup_screen:
+  lda SCREEN_ID
+  cmp #3
+  beq backup_priv_screen
+  jmp backup_publ_screen
+  rts
+
+restore_screen:
+  lda SCREEN_ID
+  cmp #3
+  beq restore_priv_screen
+  jmp restore_publ_screen  
+  rts
+
+backup_priv_screen
+  mva #1 HAVE_P_BACKUP
+  
+  rts
+  
+backup_publ_screen
+  mva #1 HAVE_M_BACKUP
+  rts
+
+restore_priv_screen
+  lda HAVE_P_BACKUP
+  cmp #1
+  beq do_p_restore
+  rts
+do_p_restore
+  rts
+  
+restore_publ_screen
+  lda HAVE_M_BACKUP
+  cmp #1
+  beq do_M_restore
+  rts
+do_M_restore
+  rts
+
+// ----------------------------------------------------------------------
 // Get the config status and the ESP Version
 // ----------------------------------------------------------------------
 get_status: 
@@ -1240,10 +1286,10 @@ startScreen:
   mva #1 curinh
   ldx #0
 cp_char_loop                           // copy charactre set
-  mva ROM_CHARS,x PUB_BACKUP,x
-  mva ROM_CHARS+$100,x PUB_BACKUP+$100,x
-  mva ROM_CHARS+$200,x PUB_BACKUP+$200,x
-  mva ROM_CHARS+$300,x PUB_BACKUP+$300,x
+  mva ROM_CHARS,x SCREEN_PUBL_BACKUP,x
+  mva ROM_CHARS+$100,x SCREEN_PUBL_BACKUP+$100,x
+  mva ROM_CHARS+$200,x SCREEN_PUBL_BACKUP+$200,x
+  mva ROM_CHARS+$300,x SCREEN_PUBL_BACKUP+$300,x
   inx
   bne cp_char_loop 
   
@@ -1251,11 +1297,11 @@ cp_char_loop                           // copy charactre set
   // copy custom chars
   ldx #0
 cust_loop  
-  mva  custom_chars,x  PUB_BACKUP,x
+  mva  custom_chars,x  SCREEN_PUBL_BACKUP,x
   inx
   cpx #128
   bne cust_loop
-  mva #>PUB_BACKUP CHARSET  // set the char pointer to the new location
+  mva #>SCREEN_PUBL_BACKUP CHARSET  // set the char pointer to the new location
   lda sm_prt                // create a pointer to the start of the screen
   sta temp_i                // and to the end of the screen
   lda sm_prt+1
@@ -1730,8 +1776,11 @@ SERVERNAME .byte 'www.chat64.nl          ',128
 TEMPI .byte 0
 
 .align $400        
-PUB_BACKUP
+SCREEN_PUBL_BACKUP
 
+  org SCREEN_PUBL_BACKUP + 1024
+SCREEN_PRIV_BACKUP
+ 
         
  run init
   
