@@ -446,24 +446,30 @@ user_list:
 ul_start
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
-  displayText text_user_list, #1,#15          // draw the menu title
+  displayText text_user_list, #1,#1          // draw the menu title
   displayText divider_line, #2,#0             // draw the divider line
   displayText divider_line, #22,#0            // draw the divider line
   displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
   lda VICEMODE
   cmp #1
-  beq ul_vice 
+  bne ul_novice 
+  jmp ul_vice 
 
-
+ul_novice
   lda TEMPI
   jsr send_start_byte_ff                      // RXBUFFER now contains the first group of users, 20
-  displayBuffer RXBUFFER,#3 ,#0
+  displayBuffer RXBUFFER,#4 ,#2
 
   lda #233
   jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
-  displayBuffer RXBUFFER,#14 ,#0
+  displayBuffer RXBUFFER,#9 ,#2
 
-  
+  lda #233
+  jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
+  displayBuffer RXBUFFER,#14 ,#2
+
+  displayText divider_line, #22,#0            // draw the divider line
+  displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
   
 ul_vice
 ul_get_key_input  
@@ -503,21 +509,42 @@ account_setup:
   
   lda VICEMODE
   cmp #1
-  beq acc_vice      
-
+  bne acc_novice     
+  jmp acc_vice
+acc_novice
   lda #243                                    // ask for the mac address, registration id, nickname and regstatus
-  jsr send_start_byte_ff                      //
-  displayBuffer  RXBUFFER,#23 ,#3             // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128)
+  jsr send_start_byte_ff                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
   mva #1 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#5 ,#13          // Display the buffers on screen (Mac address)
+  displayBuffer  SPLITBUFFER,#5 ,#14          // Display the buffers on screen (Mac address)
   mva #2 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#7 ,#13          // Display the buffers on screen (registration id)
+  displayBuffer  SPLITBUFFER,#7 ,#18          // Display the buffers on screen (registration id)
   mva #3 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#9 ,#25          // Display the buffers on screen (Nick Name)
-                                              //
+  displayBuffer  SPLITBUFFER,#9 ,#12          // Display the buffers on screen (Nick Name)
+  mva #4 splitIndex                           //
+  jsr splitRXbuffer                           //
+  lda SPLITBUFFER
+  cmp #120                                    // 120 = x  some unknown error
+  bne cp_114
+  displayText text_reg_x,#23 ,#6
+  jmp acc_input_fields
+cp_114
+  cmp #114                                    // 114 = r
+  bne cp_117
+  displayText text_reg_r,#23 ,#5
+  jmp acc_input_fields
+cp_117
+  cmp #117                                    // 117 = u
+  bne cp_110                                  // 
+  displayText text_reg_u,#23 ,#4
+  jmp acc_input_fields
+cp_110
+  cmp #110                                    // 110 = n
+  bne acc_input_fields   
+  displayText text_reg_n,#23 ,#5
+
 acc_vice                                      //
 acc_input_fields                              //
   mva #0 curinh                               // Show the cursor 
@@ -561,12 +588,18 @@ exit_to_main_menus
 account_save_settings
   displayText text_save_settings, #23, #3
   jsr wait_for_RTR
-  lda #246
+  lda #240
   sta $D502
-  mva #5 temp_i                               // Read servername and send it to cartridge
-  mva #14 temp_i+1
-  mva #25 input_fld_len
+  mva #7 temp_i                               // Read regid and send it to cartridge
+  mva #18 temp_i+1
+  mva #38 input_fld_len
   jsr read_field
+
+  mva #9 temp_i                               // Read nickname and send it to cartridge
+  mva #12 temp_i+1
+  mva #38 input_fld_len
+  jsr read_field
+
 
   mva #255 DELAY
   jsr jdelay
@@ -580,6 +613,8 @@ account_save_settings
 // Server setup screen
 // ----------------------------------------------------------------------
 server_setup:  
+  
+ 
   mva #12 MENU_ID
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0             // draw the divider line
@@ -593,6 +628,18 @@ server_setup:
   lda VICEMODE
   cmp #1
   beq svr_vice      
+  
+
+  jsr wait_for_RTR
+  lda #238
+  sta $D502
+  mva #255 DELAY
+  jsr jdelay  
+  jsr jdelay
+  
+  lda #237                                    // get server connection status
+  jsr send_start_byte_ff
+  displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the server status
   
 svr_vice 
 svr_input_fields                              //
@@ -638,6 +685,9 @@ server_save_settings
 
   mva #255 DELAY
   jsr jdelay
+  jsr wait_for_RTR
+  lda #238
+  sta $D502
   jsr jdelay
   jsr jdelay
   jsr jdelay  
@@ -1702,7 +1752,7 @@ sc_stars1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,1
 sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255  
 
   .local text_user_list
-  .byte 'USER LIST'
+  .byte 'USER LIST, inverted users are online'
   .endl
   .local text_user_list_foot
   .byte '[p] previous  [n] next  [OPT] Exit'
@@ -1848,7 +1898,21 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
      .byte 0,40,80
   .endl
   
+  .local text_reg_u
+  .byte 'Error: Unregistered Cartridge'
+  .endl
   
+  .local text_reg_n
+  .byte 'Error: Nick Name is Taken!'
+  .endl
+  
+  .local text_reg_r
+  .byte 'Registration was successful'
+  .endl
+  
+  .local text_reg_x
+  .byte 'Error: Server unreachable'
+  .endl
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------

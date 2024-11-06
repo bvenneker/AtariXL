@@ -34,7 +34,7 @@ volatile bool getMessage = false;
 volatile bool pastMatrix = false;
 volatile bool aboutToReset = false;
 volatile bool sendingMessage = false;
-String userPages[10];
+String userPages[8];
 String romVersion = "0.0";
 String newVersions ="";
 MessageBufferHandle_t commandBuffer;
@@ -126,25 +126,25 @@ bool SendMessageToServer(String Encoded, String RecipientName, int retryCount, b
 void get_full_userlist() {
   // this is for the user list in the menu (Who is on line?)
   // The second core calls this webpage so the main thread does not suffer performance
-  for (int p = 0; p < 10; p++) {
+  for (int p = 0; p < 8; p++) {
     userPages[p] = getUserList(p);
     char firstchar = userPages[p].charAt(0);
-    if (int(firstchar) != 22 ) userPages[p] = "";
+    //if ((firstchar == 'x' or firstchar == 'u') == false) userPages[p] = "      ";
   }
 }
 
 String getUserList(int page) {
-  String serverName = "http://" + server + "/zxListUsers.php";
+  String serverName = "http://" + server + "/XLlistUsers.php";
   WiFiClient client;
   HTTPClient http;
   http.setReuse(1);
   http.begin(client, serverName);
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  String httpRequestData = "regid=" + regID + "&page=" + page + "&version=3";
+  
+  String httpRequestData = "regid=" + regID + "&pagesize=15&page=" + page + "&version=2";
   unsigned long responseTime = millis();
   http.POST(httpRequestData);
   responseTime = millis() - responseTime;
-  if (responseTime > 10000) softReset();
   String result = "0";
   result = http.getString();
   result.trim();
@@ -158,7 +158,6 @@ String getUserList(int page) {
 // ****************************************************
 char getRegistrationStatus() {
   String serverName = "http://" + server + "/getRegistration.php";
-  Serial.println(serverName);
   WiFiClient client;
   HTTPClient http;
   // Connect to configured server
@@ -172,7 +171,7 @@ char getRegistrationStatus() {
   responseTime = millis() - responseTime;
   if (responseTime > 10000) softReset();
   char result = 'x';
-
+  
   if (httpResponseCode == 200) {
     String textOutput = http.getString();
     textOutput.trim();
@@ -181,6 +180,7 @@ char getRegistrationStatus() {
     else if (textOutput == "r105") result = 'n';  // registration is good but nickname is taken by someone else
     else if (textOutput == "r104") result = 'u';  // registration is not good
   }
+
   return result;
 }
 

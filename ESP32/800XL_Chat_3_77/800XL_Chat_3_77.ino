@@ -727,7 +727,8 @@ void loop() {
           xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
           xMessageBufferReceive(responseBuffer, &responseMessage, sizeof(responseMessage), portMAX_DELAY);
           regStatus = responseMessage.response.str[0];
-          send_String_to_Bus(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus);
+          
+          send_String_to_Bus(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus + char(128));
           if (regStatus == 'r' and configured == "s") {
             configured = "d";
             settings.begin("mysettings", false);
@@ -821,12 +822,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 237 = Computer triggers call to receive connection status
           // ------------------------------------------------------------------------------
-          sendByte(16);  // send INK
-          if (ResultColor == 149)
-            sendByte(4);  // send green
-          else
-            sendByte(2);  // send RED
-
+          
           send_String_to_Bus(ServerConnectResult);
 
           if ((configured == "w") and (ServerConnectResult == "Connected to chat server!")) {
@@ -874,14 +870,8 @@ void loop() {
           // we send a max of 12 users in one long string
           userpageCount = 0;
           String ul1 = userPages[userpageCount];
-
-          ul1.toCharArray(outbuffer, ul1.length() + 1);
-          for (int x = 0; x < ul1.length(); x++) {
-            if (outbuffer[x] == 130) outbuffer[x] = 0;
-            sendByte(outbuffer[x]);
-          }
-          // all done, send end byte
-          sendByte(128);
+          Serial.println(ul1);
+          send_String_to_Bus(ul1);
           userpageCount++;
           break;
         }
@@ -890,13 +880,8 @@ void loop() {
           // Computer asks for user list, second or third page.
           // we send a max of 14 users in one long string
           String ul1 = userPages[userpageCount];
-          ul1.toCharArray(outbuffer, ul1.length() + 1);
-          for (int x = 0; x < ul1.length(); x++) {
-            if (outbuffer[x] == 130) outbuffer[x] = 0;
-            sendByte(outbuffer[x]);
-          }
-          // all done, send end byte
-          sendByte(128);
+          Serial.println(ul1);
+          send_String_to_Bus(ul1);
           userpageCount++;
           if (userpageCount > 9) userpageCount = 8;
           break;
