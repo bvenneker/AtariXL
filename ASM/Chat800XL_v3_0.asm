@@ -1345,7 +1345,12 @@ silent
 // SUB ROUTINE, DELAY
 //=========================================================================================================
 jdelay:                                           // the delay sub routine is just a loop inside a loop
-                                                  // 
+    pha
+    txa
+    pha
+    tya
+    pha
+	
     ldx #00                                       // the inner loop counts up to 255
                                                   // 
 loop_d1                                           // the outer loop repeats that 255 times
@@ -1365,6 +1370,11 @@ dodelay                                           //
     jmp dodelay                                   // 
                                                   // 
 enddelay                                          // 
+    pla
+	tay
+	pla
+	tax
+	pla
     rts                                           // 
                                                   // 
                                                   
@@ -1537,9 +1547,9 @@ cust_loop
   inx
   cpx #128
   bne cust_loop
-  mva #>SCREEN_PUBL_BACKUP CHARSET  // set the char pointer to the new location
-  lda sm_prt                // create a pointer to the start of the screen
-  sta temp_i                // and to the end of the screen
+  mva #>SCREEN_PUBL_BACKUP CHARSET    // set the char pointer to the new location
+  lda sm_prt                          // create a pointer to the start of the screen
+  sta temp_i                          // and to the end of the screen
   lda sm_prt+1
   sta temp_i+1
   inc temp_i+1
@@ -1548,11 +1558,11 @@ cust_loop
   lda #16
   sta temp_i
   
-  ldy #239                 // draw the main strips 
+  ldy #239                            // draw the main strips 
 ss2
-  lda #85 
+  lda #8 //#85 
   sta (temp_i),y
-  lda #213 
+  lda #9 
   sta (sm_prt),y
   dey
   cpy #255
@@ -1603,11 +1613,16 @@ wkey2
   lda $02FC                             // wait for any key
   cmp #255                              // see if last key equals zero
   beq wkey2   
+
+
   mwa temppos CHARSET
   rts
 
 animate_stars
-   
+  tya
+  pha
+  txa
+  pha
   mwa sm_prt temp_i
   jsr shift_line_to_left
   lda temp_i
@@ -1650,7 +1665,10 @@ animate_stars
   lda #40
   sta DELAY
   jsr jdelay
-
+  pla
+  tax
+  pla
+  tay
   rts
   
 //=========================================================================================================
@@ -1803,7 +1821,7 @@ HAVE_ML_BACKUP:               .byte 0             //
 sc_big_text:                                 
 	.byte 0,0,0,0,0,0,0,0
 	.byte 3,5,5,2,10,0,0,10
-	.byte 3,5,5,2,11,87,11,0
+	.byte 3,5,5,2,11,12,11,0
 	.byte 3,5,5,2,10,0,0,0
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
@@ -1812,9 +1830,9 @@ sc_big_text:
 	.byte 7,0,0,0,10,0,0,10
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
-	.byte 7,0,0,0,65,11,11,68
-	.byte 65,11,11,68,0,10,0,0
-	.byte 7,5,5,2,4,11,11,68
+	.byte 7,0,0,0,13,11,11,14
+	.byte 13,11,11,14,0,10,0,0
+	.byte 7,5,5,2,4,11,11,14
 	.byte 0,0,0,0,0,0,0,0
 	.byte 0,0,0,0,0,0,0,0
 	.byte 7,0,0,0,10,0,0,10
