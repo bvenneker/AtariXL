@@ -361,7 +361,7 @@ void loop() {
           }
 
           if (haveMessage == 1) {
-            translateZXMessage();
+            translateAtariMessage();
             // and send the outbuffer
             send_out_buffer_to_Bus();
             // store the new message id
@@ -394,14 +394,14 @@ void loop() {
           // see if the message starts with '@'
           byte b = inbuffer[1];
           if (b == '@') {
-            toEncode = "[" + String(translateColor(int(inbuffer[0]))) + "]";
+            toEncode = "[" + String(inbuffer[0]) + "]";
             for (int x = 2; x < 15; x++) {
               byte b = inbuffer[x];
               if (b != 32 and b != ',' and b != ':' and b != ';' and b != '.') {
                 if (b < 127) {
                   RecipientName = (RecipientName + char(b));
                 } else {
-                  colorCode = "[" + String(translateColor(int(b))) + "]";
+                  colorCode = "[" + String(b) + "]";
                 }
               } else {
                 mstart = x + 1;
@@ -415,7 +415,7 @@ void loop() {
             // inbuffer[x] = screenCode_to_Ascii(inbuffer[x]);
             byte b = inbuffer[x];
             if (b > 128) {
-              toEncode = (toEncode + "[" + translateColor(int(inbuffer[x])) + "]");
+              toEncode = (toEncode + "[" + inbuffer[x] + "]");
             } else {
               toEncode = (toEncode + inbuffer[x]);
             }
@@ -618,7 +618,7 @@ void loop() {
             getMessage = true;
           }
           if (haveMessage == 2) {
-            translateZXMessage();
+            translateAtariMessage();
             // and send the outbuffer
             send_out_buffer_to_Bus();
             if (haveMessage == 2) {
@@ -960,15 +960,19 @@ void send_String_to_Bus(String s) {
 // Send the content of the outbuffer to the Bus
 // ******************************************************************************
 void send_out_buffer_to_Bus() {
+  int lastbyte=0;
   // send the content of the outbuffer to the Bus
   for (int x = 0; x < outbuffersize - 1; x++) {
     delayMicroseconds(500);    
-    Serial.print(outbuffer[x]);
+    Serial.print(outbuffer[x]);    
     sendByte(outbuffer[x]);
+    lastbyte = outbuffer[x];
   }
-  // all done, send end byte
-  delayMicroseconds(500);
-  sendByte(128);
+  // all done, send end byte if not send yet
+  if (lastbyte != 128 ){
+    delayMicroseconds(500);
+    sendByte(128);
+  }
   outbuffersize = 0;
   Serial.println("End");
 }
@@ -1047,7 +1051,8 @@ void sendByte(byte b) {
     delayMicroseconds(2);
     if (millis() > timeOut) {
       io2 = true;
-      Serial.println("Timeout in sendByte");
+      Serial.print("Timeout in sendByte: ");
+      Serial.println(b);
     }
   }
   ready_to_send(false);
@@ -1164,56 +1169,23 @@ void loadPrgfile() {
   dataFromBus = false;
 }
 
-void translateZXMessage() {
-  // do some translations for zx spectrum
-  // first byte is number of lines, this determines the start position
-  int sp = 20 - msgbuffer[0];
-  int b = 0;
-  int y = 0;
-  int zxColors[] = { 7, 7, 2, 5, 3, 4, 7, 6, 2, 2, 2, 7, 7, 4, 7, 7 };
+void translateAtariMessage() {
+  // do some translations for Atari 800 XL
+  // first byte is number of lines.
 
-  // start with number of lines
-  outbuffer[0] = msgbuffer[0];
-  // then the start position (AT)
-  outbuffer[1] = 22;  // AT
-  outbuffer[2] = sp;  // line
-  outbuffer[3] = 0;   // column
-  outbuffer[4] = 17;  // PAPER
-  outbuffer[5] = 0;   // black paper
-  y = 6;
-
-  // now check the rest of the bytes for color attributes
+  // for the atari we start with a number of shift up commands (1)
+  int sp = msgbuffer[0];
+  int y=0;
+  for (int a=0;a<sp;a++){
+    outbuffer[a] = 1; // 1 means shift up one line.  1,1,1 means shift up 3 lines
+  }
+  y=sp;
+  // now check the rest of the bytes for color attributes, those need to go
   for (int x = 1; x < msgbuffersize; x++) {
-    b = msgbuffer[x];
-    if (b == 143) {  // 143 means inverted text
-      outbuffer[y] = 20;
-      y++;
-      outbuffer[y] = 1;
-    } else if (b >= 144 and b < 160) {
-      // colors should be translated also
-
-      // 144 = black
-      // 145 = white
-      // 146 = red
-      // 147 = cyan
-      // 148 = purple
-      // 149 = green
-      // 150 = blue
-      // 151 = yellow
-      // 152 = oranje
-      // 153 = brown
-      // 154 = pink
-      // 155 = gray 1
-      // 156 = gray 2
-      // 157 = light green
-      // 158 = light blue
-      // 159 = gray 3
-
-      b = b - 144;
-      b = zxColors[b];
-      outbuffer[y] = 16;
-      y++;
-      outbuffer[y] = b;
+    int b = msgbuffer[x];
+    if (b >= 143 and b < 160) {
+      // colors should be removed
+      //outbuffer[y] = 0;      
     } else {
       outbuffer[y] = b;
     }
@@ -1224,33 +1196,7 @@ void translateZXMessage() {
   outbuffersize = y;
 }
 
-int translateColor(int color) {
-  switch (color) {
-    case 145:
-      return 150;
-      break;
-    case 146:
-      return 146;
-      break;
-    case 147:
-      return 148;
-      break;
-    case 148:
-      return 149;
-      break;
-    case 149:
-      return 147;
-      break;
-    case 150:
-      return 151;
-      break;
-    case 151:
-      return 145;
-      break;
-    default:
-      return color;
-  }
-}
+
 
 void ready_to_receive(bool b) {
   if (b)

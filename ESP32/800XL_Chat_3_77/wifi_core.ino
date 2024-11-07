@@ -337,7 +337,7 @@ void WifiCoreLoop(void* parameter) {
 
     // when the getMessage variable goes True, we drop out of the wait loop
     getMessage = false;                                                 // first reset the getMessage variable back to false.
-    String serverName = "http://" + server + "/zxReadAllMessages.php";  // set up the server and needed web page
+    String serverName = "http://" + server + "/XLReadAllMessages.php";  // set up the server and needed web page
     WiFiClient client;
     HTTPClient httpb;
 

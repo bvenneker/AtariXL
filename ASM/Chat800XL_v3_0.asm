@@ -32,7 +32,7 @@ temp_o = $19
 input_fld_len = $1A    // length of the input field
 text_color = $36
 character = $3f 
-textPointer = $40      // $40, $41 are a pointer. used in displayText
+textPointer = $40      // $40, $41 are a pointer. 
 textlen = $83
 rowcrs = $54          ; cursor row 
 colcrs = $55          ; cursor colm
@@ -70,6 +70,7 @@ init
 main 
   jsr startScreen
   mva #1 curinh
+  jsr beep1
   lda #$7D       ; load clear screen command
   jsr writeText  ; print it to screen
   jsr are_we_in_the_matrix
@@ -110,7 +111,9 @@ chat_screen
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
+ 
   displayText text_no_cartridge, #5,#6
+  
 mc_not_vice
 
   mva #255 $2fc                       ; clear keyboard buffer
@@ -126,13 +129,59 @@ chat_key_input
   jsr writeText 
   jsr text_input    // jump to the text input routine
 
+
+// ----------------------------------------------------------------------
+// shift screen up
+// ----------------------------------------------------------------------
+shift_screen_up:   
+  lda SCREEN_ID            // see on what screen we are
+  cmp #3                   // in private screen, we must ignore the first 3 lines
+  bne shift_public 
+  ldx #16
+  mwa sm_prt temp_i        // temp_i points to line 0  
+  mwa sm_prt temp_o
+  lda temp_i
+  adc #120
+  sta temp_i               // temp_i now points to line 3
+  lda temp_o
+  adc #160
+  sta temp_o               // temp_o points to line 4
+  jmp sh_up_d              // start shifting! 
+  
+shift_public    
+  ldx #19                  // in public chat we shift from line 0
+  mwa sm_prt temp_i        // temp_i points to line 0
+  mwa sm_prt temp_o
+shiftLoop
+  clc
+  lda temp_o               //
+  adc #40                  // add 40 to go to the next line
+  sta temp_o               // textPointer points to line 1
+  bcs up_hb                // we there was an overflow, increase the highbyte also
+  jmp sh_up_d
+up_hb
+  inc temp_o+1             // increase highbyte
+sh_up_d   
+  jsr shiftLine
+  mwa temp_o temp_i
+  dex    
+  bne shiftLoop
+  rts
+
+
+shiftLine:             // this routine shifts one line up
+  ldy #0               // temp_o is source
+shiftLine_loop         // temp_i is destination
+  lda (temp_o),y  
+  sta (temp_i),y
+  iny
+  cpy #40
+  bne shiftLine_loop
+  rts
+
 // ----------------------------------------------------------------------
 // backup and restore screens
 // ----------------------------------------------------------------------
-HAVE_M_BACKUP:                .byte 0             // 
-HAVE_P_BACKUP:                .byte 0             //
-HAVE_ML_BACKUP:               .byte 0             //
-
 backup_screen:
   lda SCREEN_ID
   cmp #3
@@ -951,14 +1000,58 @@ wait_for_RTS:
   bne wait_for_RTS
   rts
 
+// ----------------------------------------------------------------------
+// Check for messages
+// ----------------------------------------------------------------------
+check_for_messages:
+  lda MENU_ID
+  cmp #0
+  beq check_cont
+  jmp check_exit
+check_cont  
+  lda $14
+  cmp #128
+  bcc check_exit
+  jsr beep1  
+  lda #0
+  sta $14
+  ldy #0
+  sta (sm_prt),y
   
+  lda #254
+  jsr send_start_byte_ff  // RX buffer now contains a message or 128
+  lda RXBUFFER
+  cmp #128
+  beq check_exit
+  jmp display_message
+  
+check_exit  
+  rts
+
+LINEC .byte 0
+display_message:
+  // the RXBUFFER contains a message.
+  // the first
+  ldx #0
+make_room_loop
+  lda RXBUFFER,x
+  cmp #1
+  bne do_display
+  jsr shift_screen_up
+  inx
+  jmp make_room_loop
+  
+do_display
+  displayBuffer RXBUFFER,#19,#0
+  
+  rts
 // ----------------------------------------------------------------------
 // procedure for text input
 // ----------------------------------------------------------------------
 text_input:
   mva #0 curinh                        // show the cursor 
 key_loop
-  //jsr blinkCursor
+  jsr check_for_messages
   jsr getKey
   cmp #255
   beq key_loop
@@ -972,8 +1065,7 @@ cpselect
 cpoption
   cmp #251
   bne cpdelete
-  mva #255 $2fc                       // clear keyboard buffer 
-  jsr backup_screen
+  mva #255 $2fc                       // clear keyboard buffer   
   jmp main_menu
   
 cpdelete  
@@ -1013,8 +1105,7 @@ check_end_pos
   pla  
   lda #$1E
   jmp chrout
-rp pla
-  
+rp pla 
   
 chrout                               // output the key to screen
   pha
@@ -1049,7 +1140,7 @@ hd_ok
   lda colcrs
   cmp #0
   bne delok  
-  mva #255 $2fc                       ; clear keyboard buffer 
+  mva #255 $2fc                       // clear keyboard buffer 
   jmp key_loop
 delok  
   lda #$1E                    // this is to work around a bug. backspace does not always work  
@@ -1213,7 +1304,6 @@ beep1:
   jsr jdelay
   lda #0
   jsr chibiSound
-
   rts
 
 chibiSound: ; %nvpppppp  n=noise v=volume p=pitch
@@ -1639,6 +1729,10 @@ db_next_char
   lda (textPointer),y  
   cmp #128
   beq db_exit
+  cmp #1
+  bne write_it
+  lda #$1C // replace 1 with the line up command
+write_it
   jsr writeText
   inc character
   jmp db_next_char
@@ -1700,6 +1794,10 @@ resetAtari:
 // ----------------------------------------------------------------
 version .byte '3.77',128
 version_date .byte '10/2024',128
+
+HAVE_M_BACKUP:                .byte 0             // 
+HAVE_P_BACKUP:                .byte 0             //
+HAVE_ML_BACKUP:               .byte 0             //
 
 // data for big letters on the start screen
 sc_big_text:                                 
@@ -1919,8 +2017,8 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
 blink   .byte 0,0
 blink2  .byte 0,0
 ddlist  .word 0,0
-DELAY  .byte 0,0    
-z_as .byte 0,0
+DELAY   .byte 0,0    
+z_as    .byte 0,0
 cursorphase  .byte 0,0
 temppos  .byte 0,0   
 RXBUFFER :250 .byte 128        
