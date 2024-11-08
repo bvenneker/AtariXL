@@ -950,8 +950,8 @@ void outByte(byte c) {
 void send_String_to_Bus(String s) {
 
   outbuffersize = s.length() + 1;  // set outbuffer size
-  Serial.print("buffersize===");
-  Serial.println(outbuffersize);
+//  Serial.print("buffersize=");
+//  Serial.println(outbuffersize);
   s.toCharArray(outbuffer, outbuffersize);  // place the ssid in the output buffer
   send_out_buffer_to_Bus();                 // and send the buffer
 }
