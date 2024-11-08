@@ -43,7 +43,7 @@ splitIndex = $46
 putchar_ptr = $346    ; pointer to print routine
 curinh = $2F0         ; cursor inhibit, cursor is invisible if value is not zero
 sm_prt = $58          ; zero page pointer to screen memory
-
+sm_prt2= $59
 
   org $2000           ; program starts at $2000
 
@@ -68,11 +68,11 @@ init
   sta input_fld+1
 
 main 
+  
   jsr startScreen
   mva #1 curinh
-  jsr beep1
-  lda #$7D       ; load clear screen command
-  jsr writeText  ; print it to screen
+  jsr calculate_screen_addresses
+  jsr clear_keyboard_and_screen
   jsr are_we_in_the_matrix
   jsr get_status 
   jmp main_chat_screen
@@ -108,12 +108,17 @@ main_chat_screen:
   jmp restore_screen
 m_chat
   jsr clear_keyboard_and_screen
+
 chat_screen
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
  
   displayText text_no_cartridge, #5,#6
+// low byte = 64 (hex 40)
+// high byte = 188 (hex BC)
+// BC40 = 48192
+// 48192 + (40 x 19) = BF38  
   
 mc_not_vice
 
@@ -1034,46 +1039,38 @@ check_exit
 savex .byte 0
 savecr .byte 0
 savecc .byte 0
-lofst .byte 0
 display_message:
   // the RXBUFFER contains a message.
-  mva #128 lofst
   mva colcrs savecc
   mva rowcrs savecr
   ldx #0 
 make_room_loop
   lda RXBUFFER,x
   cmp #1
-  bne do_display
+  bne get_display_start_address
   stx savex
   jsr shift_screen_up
-  lda lofst
-  adc #40
-  sta lofst
   ldx savex
   inx
   jmp make_room_loop
   
-do_display
-  
-  // determine start position
-  clc
-  lda sm_prt              ; load the lowbyte of the pointer for screen memory
-  adc lofst  //#128                ; add 128 (for a 4 line message)
-  sta temp_i       
+get_display_start_address  
+  // determine start address in screen memory
+  mwa startLine1 temp_i  
   lda savex
-  cmp #4
-  jmp dp_hb
- 
-dp_hb
-  lda sm_prt+1    
-  adc #2          
-  sta temp_i+1   
-  lda #3
-  ldy #0
-  sta (temp_i),y
-  jmp get_m_exit
-
+  cmp #0
+  beq do_display
+  mwa startLine2 temp_i  
+  lda savex
+  cmp #1
+  beq do_display
+  mwa startLine3 temp_i  
+  lda savex
+  cmp #2
+  beq do_display
+  mwa startLine4 temp_i  
+  
+do_display
   // loop the RX buffer
   ldx savex
   ldy #0
@@ -1849,7 +1846,37 @@ exitRTS
 resetAtari:  
    jmp $E477            // jump to reboot vector to restart the Atari.
 
+// ----------------------------------------------------------------------
+// Calculate the addresses of where the messages will start
+// ----------------------------------------------------------------------
+calculate_screen_addresses:  
+  mwa sm_prt temp_i   // calculate some adresses from the start of screen memory (sm_prt)
+  lda temp_i
+  clc
+  adc #$80
+  sta startLine4  // C0
+  adc #$28
+  sta startLine3  // E8
+  adc #$28
+  clc
+  sta startLine2  // 10
+  adc #$28
+  sta startLine1  // 38
   
+  lda temp_i+1
+  adc #2
+  sta startLine4+1
+  sta startLine3+1
+  lda temp_i+1
+  adc #3
+  sta startLine2+1
+  sta startLine1+1
+//  sta $BF38  // start adres bij 1 regel (system message ofzo)
+//  sta $BF10  // start adres bij 2 regels
+//  sta $BEE8  // start adres bij 3 regels
+//  sta $BEC0  // start adres bij 4 regels
+  rts
+
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
@@ -2097,6 +2124,12 @@ p_cursor_x .byte 0
 p_cursor_y .byte 0
 m_cursor_x .byte 0
 m_cursor_y .byte 0
+startLine4 .byte 0,0   // start address when message is 4 lines
+startLine3 .byte 0,0   // start address when message is 3 lines
+startLine2 .byte 0,0   // start address when message is 2 lines
+startLine1 .byte 0,0   // start address when message is 1 lines
+
+
   
 // -----------------------------------
 // Print the RX Buffer on screen
