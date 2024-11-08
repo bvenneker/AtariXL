@@ -1345,12 +1345,12 @@ silent
 // SUB ROUTINE, DELAY
 //=========================================================================================================
 jdelay:                                           // the delay sub routine is just a loop inside a loop
-    pha
-    txa
-    pha
-    tya
-    pha
-	
+    pha                                           // Backup a,x,y registers to the stack
+    txa                                           //
+    pha                                           // Backup a,x,y registers to the stack
+    tya                                           //
+    pha                                           // Backup a,x,y registers to the stack
+	                                              //
     ldx #00                                       // the inner loop counts up to 255
                                                   // 
 loop_d1                                           // the outer loop repeats that 255 times
@@ -1364,17 +1364,15 @@ dodelay                                           //
                                                   // 
     cpy #255                                      // 
     beq loop_d1                                   // 
-    nop                                           // 
-    nop                                           // 
     iny                                           // 
     jmp dodelay                                   // 
                                                   // 
 enddelay                                          // 
-    pla
-	tay
-	pla
-	tax
-	pla
+    pla                                           // Pull a,x,y registers from the stack
+	tay                                           //
+	pla                                           //
+	tax                                           //
+	pla                                           //
     rts                                           // 
                                                   // 
                                                   
