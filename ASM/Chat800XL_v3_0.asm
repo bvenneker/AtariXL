@@ -98,7 +98,8 @@ p_chat
   displayText text_F5_toggle, #1,#0    ; draw the menu title
   displayText divider_line, #2,#0    ; draw the divider line
   jmp chat_screen
-
+ 
+  
 // ----------------------------------------------------------------------
 // PUBLIC MESSAGING SCREEN
 // ----------------------------------------------------------------------
@@ -119,7 +120,8 @@ mc_not_vice
   mva #255 $2fc                       ; clear keyboard buffer
   mva #0 colcrs                       ; set cursor row position to zero  
   displayText divider_line, #20,#0    ; draw the divider line
-  
+ 
+
   jsr clearInputLines
 chat_key_input
   mva #0 curinh     // show the cursor
@@ -129,6 +131,7 @@ chat_key_input
   jsr writeText 
   jsr text_input    // jump to the text input routine
 
+//
 
 // ----------------------------------------------------------------------
 // shift screen up
@@ -1010,13 +1013,12 @@ check_for_messages:
   jmp check_exit
 check_cont  
   lda $14
-  cmp #128
+  cmp #80
   bcc check_exit
   jsr beep1  
   lda #0
   sta $14
   ldy #0
-  sta (sm_prt),y
   
   lda #254
   jsr send_start_byte_ff  // RX buffer now contains a message or 128
@@ -1028,22 +1030,65 @@ check_cont
 check_exit  
   rts
 
-LINEC .byte 0
+//LINEC .byte 0
+savex .byte 0
+savecr .byte 0
+savecc .byte 0
+lofst .byte 0
 display_message:
   // the RXBUFFER contains a message.
-  // the first
-  ldx #0
+  mva #128 lofst
+  mva colcrs savecc
+  mva rowcrs savecr
+  ldx #0 
 make_room_loop
   lda RXBUFFER,x
   cmp #1
   bne do_display
+  stx savex
   jsr shift_screen_up
+  lda lofst
+  adc #40
+  sta lofst
+  ldx savex
   inx
   jmp make_room_loop
   
 do_display
-  displayBuffer RXBUFFER,#19,#0
   
+  // determine start position
+  clc
+  lda sm_prt              ; load the lowbyte of the pointer for screen memory
+  adc lofst  //#128                ; add 128 (for a 4 line message)
+  sta temp_i       
+  lda savex
+  cmp #4
+  jmp dp_hb
+ 
+dp_hb
+  lda sm_prt+1    
+  adc #2          
+  sta temp_i+1   
+  lda #3
+  ldy #0
+  sta (temp_i),y
+  jmp get_m_exit
+
+  // loop the RX buffer
+  ldx savex
+  ldy #0
+rxb_loop
+  lda RXBUFFER,x
+  cmp #128
+  beq get_m_exit
+  sta (temp_i),y
+  iny
+  inx
+  jmp rxb_loop
+get_m_exit  
+  mva savecc colcrs 
+  mva savecr rowcrs  
+  //mva #70 $14
   rts
 // ----------------------------------------------------------------------
 // procedure for text input
@@ -1747,9 +1792,9 @@ db_next_char
   lda (textPointer),y  
   cmp #128
   beq db_exit
-  cmp #1
-  bne write_it
-  lda #$1C // replace 1 with the line up command
+//  cmp #1
+//  bne write_it
+//  lda #$1C // replace 1 with the line up command
 write_it
   jsr writeText
   inc character

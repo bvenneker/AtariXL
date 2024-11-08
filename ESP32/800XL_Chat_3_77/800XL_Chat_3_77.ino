@@ -967,6 +967,7 @@ void send_out_buffer_to_Bus() {
     Serial.print(outbuffer[x]);    
     sendByte(outbuffer[x]);
     lastbyte = outbuffer[x];
+     
   }
   // all done, send end byte if not send yet
   if (lastbyte != 128 ){
