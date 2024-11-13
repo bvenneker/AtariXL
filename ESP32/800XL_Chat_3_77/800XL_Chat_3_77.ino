@@ -60,7 +60,7 @@ WiFiResponseMessage responseMessage;
 // ********************************
 // **        INPUTS             **
 // ********************************
-#define resetSwitch GPIO_NUM_26   
+#define resetSwitch GPIO_NUM_26
 #define BusIO1 GPIO_NUM_22
 #define sdata GPIO_NUM_34
 #define BusIO2 GPIO_NUM_13
@@ -281,7 +281,7 @@ void loop() {
       digitalWrite(CLED, LOW);
       wificonnected = 0;
       myLocalIp = "0.0.0.0";
-      urgentMessage = "[red]Error in WiFi connection.       ";
+      urgentMessage = "Error in WiFi connection.       ";
       wifiError = true;
     }
 
@@ -382,43 +382,35 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 253 = new chat message from Computer to database
           // ------------------------------------------------------------------------------
-
           // we expect a chat message from the Computer
+          
           receive_buffer_from_Bus(1);
 
           String toEncode = "";
           String RecipientName = "";
           int mstart = 0;
-          String colorCode = "[145]";
+
           // Get the RecipientName
           // see if the message starts with '@'
-          byte b = inbuffer[1];
-          if (b == '@') {
-            toEncode = "[" + String(inbuffer[0]) + "]";
-            for (int x = 2; x < 15; x++) {
+          byte b = inbuffer[0];
+          if (b == '@') {            
+            for (int x = 1; x < 15; x++) {
               byte b = inbuffer[x];
-              if (b != 32 and b != ',' and b != ':' and b != ';' and b != '.') {
+              if (b != ' ' and b != ',' and b != ':' and b != ';' and b != '.') {
                 if (b < 127) {
                   RecipientName = (RecipientName + char(b));
-                } else {
-                  colorCode = "[" + String(b) + "]";
                 }
               } else {
                 mstart = x + 1;
-                toEncode = toEncode + "@" + RecipientName + " " + colorCode;
+                toEncode = toEncode + "[145]@" + RecipientName + " ";
                 break;
               }
             }
           }
 
-          for (int x = mstart; x < inbuffersize; x++) {
-            // inbuffer[x] = screenCode_to_Ascii(inbuffer[x]);
-            byte b = inbuffer[x];
-            if (b > 128) {
-              toEncode = (toEncode + "[" + inbuffer[x] + "]");
-            } else {
-              toEncode = (toEncode + inbuffer[x]);
-            }
+          for (int x = mstart; x < inbuffersize-1; x++) {            
+            byte b = inbuffer[x];               
+            toEncode = (toEncode + inbuffer[x]);             
           }
 
           if (RecipientName != "") {
@@ -443,25 +435,28 @@ void loop() {
 #ifdef debug
               Serial.println("Username not found in list");
 #endif
-              urgentMessage = "System: Unknown user:" + RecipientName;
+              urgentMessage = "Error: Unknown user:" + RecipientName;
               send_error = 1;
               break;
             }
           } else {
             msgtype = "public";
           }
-
+          toEncode.trim();
           int buflen = toEncode.length() + 1;
+          Serial.print("Buffer len=");
+          Serial.println(buflen);
+          if (buflen <= 1) break;
           char buff[buflen];
           toEncode.toCharArray(buff, buflen);
-          //Serial.print("toEncode=");
-          //Serial.println(toEncode);
-
+          Serial.print("toEncode=");
+          Serial.println(toEncode);
+            
           String Encoded = my_base64_encode(buff, buflen);
 
           // Now send it with retry!
           bool sc = false;
-          int retry = 0;
+          int retry = 99;
           while (sc == false and retry < 2) {
             sendingMessage = 1;
             commandMessage.command = SendMessageToServerCommand;
@@ -479,7 +474,7 @@ void loop() {
           }
           // if it still fails after a few retries, give us an error.
           if (!sc) {
-            urgentMessage = "[red]ERROR: sending the message";
+            urgentMessage = ">>ERROR: sending the message<<";
             send_error = 1;
           } else {
             // No error, read the message back from the database to show it on screen
@@ -494,6 +489,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // 252 = Computer sends the new wifi network name (ssid) AND password AND time offset
           // ------------------------------------------------------------------------------
+           
           receive_buffer_from_Bus(3);
           // inbuffer now contains "SSID password timeoffset"
           char bns[inbuffersize + 1];
@@ -504,7 +500,7 @@ void loop() {
 
           ssid.trim();
           Serial.print("SSID=");
-          Serial.println(ssid);          
+          Serial.println(ssid);
           password = getValue(ns, 129, 1);
           password.trim();
           Serial.print("PASW=");
@@ -555,9 +551,9 @@ void loop() {
             send_String_to_Bus("    Not Connected to Wifi         ");
           } else {
             wificonnected = 1;
-            digitalWrite(CLED, HIGH);          
+            digitalWrite(CLED, HIGH);
             String wifi_status = "Connected, ip: " + myLocalIp + "             ";
-            wifi_status = wifi_status.substring(0,35);
+            wifi_status = wifi_status.substring(0, 35);
 
             send_String_to_Bus(wifi_status);
             if (configured == "empty") {
@@ -643,7 +639,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 246 = Computer sends a new chat server ip/fqdn
           // ------------------------------------------------------------------------------
-
+           
           receive_buffer_from_Bus(1);
 
           char bns[inbuffersize + 1];
@@ -670,11 +666,12 @@ void loop() {
           // start byte 245 = Computer checks if the Cartridge is connected at all.. or are we running in a simulator?
           // -----------------------------------------------------------------------------------------------------
           // receive the ROM version number
+          
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           // filter out any unwanted bytes, keep only ./01234567890
           for (int k = 0; k < inbuffersize; k++) {
-            inbuffer[k] = inbuffer[k]-32;
+            inbuffer[k] = inbuffer[k] - 32;  // translate to atari screen coding
             if (inbuffer[k] < 45 or inbuffer[k] > 57) inbuffer[k] = 32;
           }
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -698,6 +695,7 @@ void loop() {
           // start byte 244 = Computer sends the command to reset the cartridge to factory defaults
           // ---------------------------------------------------------------------------------
           // this will reset all settings
+          
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -727,7 +725,7 @@ void loop() {
           xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
           xMessageBufferReceive(responseBuffer, &responseMessage, sizeof(responseMessage), portMAX_DELAY);
           regStatus = responseMessage.response.str[0];
-          
+
           send_String_to_Bus(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus + char(128));
           if (regStatus == 'r' and configured == "s") {
             configured = "d";
@@ -822,7 +820,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 237 = Computer triggers call to receive connection status
           // ------------------------------------------------------------------------------
-          
+
           send_String_to_Bus(ServerConnectResult);
 
           if ((configured == "w") and (ServerConnectResult == "Connected to chat server!")) {
@@ -853,7 +851,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 235 = Computer sends configuration status
           // ------------------------------------------------------------------------------
-
+          
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -887,7 +885,7 @@ void loop() {
           break;
         }
       case 232:
-       {  
+        {
           Serial.println("RESET button on Atari pressed");
           ESP.restart();
           //reboot();
@@ -895,6 +893,7 @@ void loop() {
         }
       case 231:
         {  // do the update!
+         
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -949,9 +948,9 @@ void outByte(byte c) {
 // ******************************************************************************
 void send_String_to_Bus(String s) {
 
-  outbuffersize = s.length() + 1;  // set outbuffer size
-//  Serial.print("buffersize=");
-//  Serial.println(outbuffersize);
+  outbuffersize = s.length() + 1;           // set outbuffer size
+                                            //  Serial.print("buffersize=");
+                                            //  Serial.println(outbuffersize);
   s.toCharArray(outbuffer, outbuffersize);  // place the ssid in the output buffer
   send_out_buffer_to_Bus();                 // and send the buffer
 }
@@ -960,22 +959,19 @@ void send_String_to_Bus(String s) {
 // Send the content of the outbuffer to the Bus
 // ******************************************************************************
 void send_out_buffer_to_Bus() {
-  int lastbyte=0;
+  int lastbyte = 0;
   // send the content of the outbuffer to the Bus
   for (int x = 0; x < outbuffersize - 1; x++) {
     delayMicroseconds(500);    
-    Serial.print(outbuffer[x]);    
     sendByte(outbuffer[x]);
     lastbyte = outbuffer[x];
-     
   }
   // all done, send end byte if not send yet
-  if (lastbyte != 128 ){
+  if (lastbyte != 128) {
     delayMicroseconds(500);
     sendByte(128);
   }
   outbuffersize = 0;
-  Serial.println("End");
 }
 
 // ******************************************************************************
@@ -1000,7 +996,7 @@ void receive_buffer_from_Bus(int cnt) {
   int i = 0;
   while (cnt > 0) {
     ready_to_receive(true);  // ready for next byte
-    unsigned long timeOut = millis() + 500;
+    unsigned long timeOut = millis() + 50;
 
     while (dataFromBus == false) {
       delayMicroseconds(2);  // wait for next byte
@@ -1014,8 +1010,8 @@ void receive_buffer_from_Bus(int cnt) {
     }
     ready_to_receive(false);
     dataFromBus = false;
-    inbuffer[i] = Atari_to_Ascii(ch);  
-    //Serial.print(inbuffer[i]);  
+    inbuffer[i] = Atari_to_Ascii(ch);
+    Serial.print(inbuffer[i]);
     i++;
     if (i > 248) {  //this should never happen
 #ifdef debug
@@ -1029,13 +1025,12 @@ void receive_buffer_from_Bus(int cnt) {
       cnt--;
       inbuffer[i] = 129;
       i++;
-      //Serial.println();
+      Serial.println();
     }
   }
   i--;
   inbuffer[i] = 0;  // close the buffer
   inbuffersize = i;
-  Serial.println();
 }
 
 
@@ -1116,24 +1111,22 @@ void Deserialize() {
 // ******************************************************************************
 void doUrgentMessage() {
   int color = 2;
-  if (urgentMessage.startsWith("[grn]")) color = 4;
-
   if (urgentMessage != "") {
-    urgentMessage = "          " + urgentMessage + "  ";
+    urgentMessage = " " + urgentMessage;
+
     outbuffersize = urgentMessage.length() + 1;
     urgentMessage.toCharArray(outbuffer, outbuffersize);
-    outbuffer[0] = 1;                   // One line
-    outbuffer[1] = 22;                  // AT
-    outbuffer[2] = 19;                  // line
-    outbuffer[3] = 0;                   // column
-    outbuffer[4] = 17;                  // PAPER
-    outbuffer[5] = 0;                   // black paper
-    outbuffer[6] = 20;                  // INVERSE
-    outbuffer[7] = 1;                   // inverse ON
-    outbuffer[8] = 16;                  // INK
-    outbuffer[9] = color;               // red or green or whatever
-    outbuffer[outbuffersize - 3] = 20;  // Inverse
-    outbuffer[outbuffersize - 2] = 0;   // inverse off
+    outbuffer[0] = 1;
+
+    for (int x = 1; x < outbuffersize; x++) {
+      int b = outbuffer[x] + 128; // add 128 to inverse the text
+      if (b < 97) b = b - 32;
+      if (b >= 160 and b < 192) b = b - 32;
+      else if (b > 191 and b < 225) b = b - 32;
+      if (b == 128) b = 254;
+      outbuffer[x] = b;
+    }
+
     send_out_buffer_to_Bus();
     urgentMessage = "";
   }
@@ -1176,20 +1169,20 @@ void translateAtariMessage() {
 
   // for the atari we start with a number of shift up commands (1)
   int sp = msgbuffer[0];
-  int y=0;
-  for (int a=0;a<sp;a++){
-    outbuffer[a] = 1; // 1 means shift up one line.  1,1,1 means shift up 3 lines
+  int y = 0;
+  for (int a = 0; a < sp; a++) {
+    outbuffer[a] = 1;  // 1 means shift up one line.  1,1,1 means shift up 3 lines
   }
-  y=sp;
-  // now check the rest of the bytes for color attributes, those need to go
+  y = sp;
+  // now convert to internal codes (screen codes)
   for (int x = 1; x < msgbuffersize; x++) {
     int b = msgbuffer[x];
-    if (b >= 143 and b < 160) {
-      // colors should be removed
-      //outbuffer[y] = 0;      
-    } else {
-      outbuffer[y] = b;
-    }
+    if (b < 97) b = b - 32;
+    if (b >= 160 and b < 192) b = b - 32;
+    else if (b > 191 and b < 225) b = b - 32;
+
+    if (b == 128) b = 254;
+    outbuffer[y] = b;
     y++;
   }
 

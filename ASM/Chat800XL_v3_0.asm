@@ -56,21 +56,25 @@ init
   adc #3                 ; add 3
   sta inputfield+1       ; store in $44.
   
-  lda #0  
+//  lda #4  
 //  sta color4
+  
 //  sta color2
+  lda #0
   sta character  
+  sta inhsend 
+  sta doswitch
+  sta restoreMessageLines
   sta MENU_ID
   sta SCREEN_ID
   lda sm_prt
   sta input_fld
   lda sm_prt+1
   sta input_fld+1
-
-main 
   
-  jsr startScreen
-  mva #1 curinh
+main   
+  jsr startScreen  
+  jsr hide_cursor
   jsr calculate_screen_addresses
   jsr clear_keyboard_and_screen
   jsr are_we_in_the_matrix
@@ -79,8 +83,9 @@ main
 // ----------------------------------------------------------------------
 // toggle between private and public messaging
 // ----------------------------------------------------------------------
-toggle_screens:
+toggle_screens:  
   jsr backup_screen                // make a backup of the current screen
+  jsr soundzipp
   lda SCREEN_ID
   cmp #3
   bne private_chat_screen
@@ -108,35 +113,31 @@ main_chat_screen:
   jmp restore_screen
 m_chat
   jsr clear_keyboard_and_screen
-
 chat_screen
+  
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
- 
+  
+  jsr errorSound
+  
   displayText text_no_cartridge, #5,#6
-// low byte = 64 (hex 40)
-// high byte = 188 (hex BC)
-// BC40 = 48192
-// 48192 + (40 x 19) = BF38  
+  
   
 mc_not_vice
 
   mva #255 $2fc                       ; clear keyboard buffer
   mva #0 colcrs                       ; set cursor row position to zero  
   displayText divider_line, #20,#0    ; draw the divider line
- 
 
   jsr clearInputLines
+  
 chat_key_input
-  mva #0 curinh     // show the cursor
-  lda #32
-  jsr writeText 
-  lda #$1E                                    // step cursor left
-  jsr writeText 
+  jsr restore_message_lines
+  jsr show_cursor
   jsr text_input    // jump to the text input routine
 
-//
+
 
 // ----------------------------------------------------------------------
 // shift screen up
@@ -174,6 +175,14 @@ sh_up_d
   mwa temp_o temp_i
   dex    
   bne shiftLoop
+  mwa startLine1 temp_i    // clear the last line
+  ldy #39
+  lda #0  
+line_clear_loop    
+  sta (temp_i),y
+  dey
+  bne line_clear_loop
+
   rts
 
 
@@ -190,7 +199,39 @@ shiftLine_loop         // temp_i is destination
 // ----------------------------------------------------------------------
 // backup and restore screens
 // ----------------------------------------------------------------------
+
+backup_message:
+  mva rowcrs m_cursor_y
+  mva colcrs m_cursor_x
+  jsr move_cursor_out_of_the_way
+  ldy #0
+ml_b_loop                   // backup message lines
+  lda (inputfield),y
+  sta MESSAGE_LINES_BACKUP,y
+  iny
+  cpy #121
+  bne ml_b_loop
+  rts
+  
+move_cursor_out_of_the_way:
+crs_up
+  lda #28
+  jsr writetext
+  lda rowcrs
+  cmp #20  
+  bne crs_up
+  jsr hide_cursor
+  rts
+
+
 backup_screen:
+  mva rowcrs tempi
+  jsr move_cursor_out_of_the_way
+  lda MENU_ID
+  cmp #0
+  beq bs_c
+  rts
+bs_c  
   lda SCREEN_ID
   cmp #3
   beq backup_priv_screen
@@ -199,7 +240,7 @@ backup_screen:
 
 backup_priv_screen
   mva colcrs p_cursor_x
-  mva rowcrs p_cursor_y
+  mva tempi p_cursor_y
   mva #1 HAVE_P_BACKUP
   mva #<SCREEN_PRIV_BACKUP temp_i
   mva #>SCREEN_PRIV_BACKUP temp_i+1
@@ -208,7 +249,7 @@ backup_priv_screen
   
 backup_publ_screen
   mva colcrs m_cursor_x
-  mva rowcrs m_cursor_y
+  mva tempi m_cursor_y
   mva #1 HAVE_M_BACKUP  
   mva #<SCREEN_PUBL_BACKUP temp_i
   mva #>SCREEN_PUBL_BACKUP temp_i+1
@@ -264,13 +305,16 @@ restore_priv_screen
   lda HAVE_P_BACKUP
   cmp #1
   beq do_p_restore
+  mva p_cursor_x colcrs    // restore the cursor position
+  mva p_cursor_y rowcrs    // restore the cursor position  
+
   jmp p_chat
 do_p_restore
   mva #<SCREEN_PRIV_BACKUP temp_i
   mva #>SCREEN_PRIV_BACKUP temp_i+1
   jsr restore_the_screen 
   mva p_cursor_x colcrs    // restore the cursor position
-  mva p_cursor_y rowcrs    // restore the cursor position
+  mva p_cursor_y rowcrs    // restore the cursor position  
   jmp chat_key_input
   
 restore_publ_screen
@@ -284,6 +328,7 @@ do_M_restore
   jsr restore_the_screen 
   mva m_cursor_x colcrs   // restore the cursor position
   mva m_cursor_y rowcrs   // restore the cursor position
+  
   jmp chat_key_input
 
 restore_the_screen
@@ -322,7 +367,31 @@ restoreloop4
   iny
   cpy #192
   bne restoreloop4
-  
+  rts
+
+restore_message_lines:
+  lda SCREEN_ID
+  cmp #3
+  bne rml_exit
+  lda restoreMessageLines // the last 120 characters in the public backup needs to be restored
+  cmp #1
+  bne rml_exit
+  ldy #0
+rms_loop  
+  lda MESSAGE_LINES_BACKUP,y
+  sta (inputfield),y  
+  iny
+  cpy #121
+  bne rms_loop
+  lda #0
+  sta restoreMessageLines
+  mva m_cursor_y rowcrs 
+  mva m_cursor_x colcrs 
+  jsr soundzipp
+  jsr soundzipp
+  jsr soundzipp
+rml_exit
+
   rts
 // ----------------------------------------------------------------------
 // Get the config status and the ESP Version
@@ -437,6 +506,7 @@ no_match
 exit_main_menu
   lda #0
   sta MENU_ID
+  mva #255 $2fc                       // clear keyboard buffer
   jmp restore_screen
   
 
@@ -603,10 +673,10 @@ cp_110
   displayText text_reg_n,#23 ,#5
 
 acc_vice                                      //
-acc_input_fields                              //
-  mva #0 curinh                               // Show the cursor 
+acc_input_fields                              // 
   mva #7 rowcrs                               // Put the cursor in the registration id field
   mva #17 colcrs                              //
+  jsr show_cursor
   mva #19 FIELD_MIN                           //
   mva #35 FIELD_MAX                           //
   lda #32                                     //
@@ -621,10 +691,7 @@ acc_input_fields                              //
   lda #32                                     //
   jsr writeText                               //
   jsr text_input                              //
-
-  mva #1 curinh                               // Hide the cursor
-  lda #$1E                                    // step cursor left
-  jsr writeText                               // now it becomes invisible   
+  jsr hide_cursor
   
   displayText text_start_save_settings, #13,#3
 account_setup_key_input:
@@ -700,18 +767,15 @@ server_setup:
   
 svr_vice 
 svr_input_fields                              //
-  mva #0 curinh                               // Show the cursor 
   mva #5 rowcrs                               // Put the cursor in the Server Name field
   mva #13 colcrs                              //
   mva #15 FIELD_MIN                           //
   mva #38 FIELD_MAX                           //
   lda #32
   jsr writeText
+  jsr show_cursor
   jsr text_input
-  mva #1 curinh                               // Hide the cursor
-  lda #$1E                                    // step cursor left
-  jsr writeText                               // now it becomes invisible   
-
+  jsr hide_cursor
   displayText text_start_save_settings, #13,#3
   
 server_setup_key_input:
@@ -786,43 +850,37 @@ wifi_get_cred
                                               //
 wf_vice                                       //
 wifi_input_fields                             //
-  mva #0 curinh                               // Show the cursor 
   mva #5 rowcrs                               // Put the cursor in the SSID field
   mva #8 colcrs                               //
   mva #10 FIELD_MIN                           //
   mva #35 FIELD_MAX                           //
   lda #32
   jsr writeText
+  jsr show_cursor
   jsr text_input
-  mva #1 curinh                               // Hide the cursor
-  lda #$1E                                    // step cursor left
-  jsr writeText                               // now it becomes invisible  
+  jsr hide_cursor  
   
   mva #255 $2fc                               // Clear keyboard buffer
-  mva #0 curinh                               // Show the cursor 
   mva #7 rowcrs                               // Put the cursor in the password field
   mva #12 colcrs 
   mva #14 FIELD_MIN
   mva #35 FIELD_MAX
   lda #32
   jsr writeText
+  jsr show_cursor
   jsr text_input
-  mva #1 curinh                               // hide the cursor
-  lda #$1E
-  jsr writeText
+  jsr hide_cursor
   
   mva #255 $2fc                               // clear keyboard buffer
-  mva #0 curinh                               // show the cursor 
   mva #9 rowcrs                               // put the cursor in the time-offset field
   mva #24 colcrs 
   mva #26 FIELD_MIN
   mva #32 FIELD_MAX
   lda #32
   jsr writeText
+  jsr show_cursor
   jsr text_input
-  mva #1 curinh                               // hide the cursor
-  lda #$1E
-  jsr writeText
+  jsr hide_cursor
 
   displayText text_start_save_settings, #13,#3
 wifi_setup_key_input:
@@ -1019,13 +1077,22 @@ check_for_messages:
 check_cont  
   lda $14
   cmp #80
-  bcc check_exit
-  jsr beep1  
+  bcc check_exit    
   lda #0
   sta $14
   ldy #0
-  
+
+  lda VICEMODE
+  cmp #1
+  beq check_exit
+  lda SCREEN_ID  
+  cmp #3  
+  bne check_is_publ  
+  lda #247
+  jmp check_ff 
+check_is_publ
   lda #254
+check_ff
   jsr send_start_byte_ff  // RX buffer now contains a message or 128
   lda RXBUFFER
   cmp #128
@@ -1041,6 +1108,7 @@ savecr .byte 0
 savecc .byte 0
 display_message:
   // the RXBUFFER contains a message.
+  
   mva colcrs savecc
   mva rowcrs savecr
   ldx #0 
@@ -1070,22 +1138,30 @@ get_display_start_address
   beq do_display
   mwa startLine4 temp_i  
   
-do_display
+do_display     
   // loop the RX buffer
   ldx savex
+  inx
   ldy #0
 rxb_loop
-  lda RXBUFFER,x
+  lda RXBUFFER,x  
   cmp #128
   beq get_m_exit
+  cmp #254        // we use this as inverted space
+  bne write_char
+  lda #128        // this is a real inverted space
+write_char
   sta (temp_i),y
   iny
   inx
   jmp rxb_loop
+  
 get_m_exit  
+  jsr bell1  
   mva savecc colcrs 
   mva savecr rowcrs  
-  //mva #70 $14
+  mva #80 $14
+   
   rts
 // ----------------------------------------------------------------------
 // procedure for text input
@@ -1101,14 +1177,38 @@ key_loop
 cpselect
   cmp #252
   bne cpoption
+  lda MENU_ID
+  cmp #10
+  bcs key_loop
   mva #255 $2fc                       // clear keyboard buffer 
   jmp toggle_screens
   
 cpoption
   cmp #251
-  bne cpdelete
+  bne cpstart
   mva #255 $2fc                       // clear keyboard buffer   
+  jsr backup_screen
   jmp main_menu
+
+cpstart  
+  cmp #253
+  bne cpdelete
+  lda MENU_ID
+  cmp #10
+  bcs key_loop
+  mva #255 $2fc                       // clear keyboard buffer   
+  jsr check_private                  // check if users tries to send a private message
+  jsr send_message
+  mva #0 inhsend
+  lda doswitch
+  cmp #1
+  bne cpstart_exit
+  mva #255 $2fc                       // clear keyboard buffer 
+  jsr clearinputlines
+  mva #0 doswitch
+  jmp toggle_screens
+cpstart_exit  
+  jmp key_loop
   
 cpdelete  
   cmp #8 ; delete
@@ -1339,6 +1439,94 @@ exit_bc
 // ----------------------------------------------------------------------
 // procedure for sound
 // ----------------------------------------------------------------------
+
+
+
+ttone .byte 0
+playTone:
+  // a = 1 to 63 (pitch)
+  // x = length
+  sta ttone
+  stx DELAY
+  lda #%01000000
+  ora ttone
+  jsr chibiSound
+  jsr jdelay
+  lda #0
+  jsr chibiSound
+  rts
+
+updateSound:  
+  ldx #55
+  lda #35
+  jsr playTone
+  ldx #2
+  lda #0
+  jsr playTone  
+  ldx #50
+  lda #35
+  jsr playTone
+  lda #25
+  jsr playTone
+  lda #35  
+  jsr playTone
+  lda #30  
+  jsr playTone
+  ldx #90
+  lda #20  
+  jsr playTone
+  rts
+  
+soundzipp:
+  ldx #5
+  lda #20  
+  jsr playTone
+  lda #18  
+  jsr playTone
+  lda #16
+  jsr playTone
+  lda #14
+  jsr playTone
+  lda #12
+  jsr playTone
+  lda #10
+  jsr playTone
+  lda #8
+  jsr playTone
+  lda #6
+  jsr playTone
+  lda #4
+  jsr playTone
+  rts
+  
+bell1:  
+  ldx #10
+  lda #25
+  jsr playTone
+  lda #25
+  jsr playTone
+  lda #22
+  jsr playTone    
+  lda #19
+  jsr playTone
+  lda #14
+  jsr playTone
+  rts
+  
+errorSound:
+  ldx #30
+  lda #63
+  jsr playTone
+  lda #61
+  jsr playTone
+  lda #63
+  jsr playTone
+  lda #62
+  jsr playTone
+  lda #61
+  jsr playTone
+  rts
+  
 beep1:
   lda #%01001000
   jsr chibiSound
@@ -1436,13 +1624,12 @@ cl_loop
   beq cl_exit
   jmp cl_loop
 cl_exit
-  mva #21 rowcrs
+  lda #0
+  sta curinh
+  mva #20 rowcrs
   mva #0 colcrs
-  lda #32           // type a space character
-  jsr writeText     //
-  lda #$7e          // remove the space character
-  jsr writeText     // now the cursor is visible
-
+  lda #29 
+  jsr writetext
   rts
 
  
@@ -1461,7 +1648,7 @@ kb2asci:
 //          61  62   63  64  65 66  67 68 69  70  71  72  73  74  75 76  77  78  79  80 81  82 83 84  85  86  87  88 89 90
   .byte     'g','s','a','L','J',':', 3,68,'K','\','^','O',73,'P','U',76,'I','_','|','V',81,'C',83,84,'B','X','Z','$',89,'#'
 //          91  92  93  94  95  96 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 
-  .byte     '&',28,'%','"','!','[',33,']','N',100,'M','?', 39,'R',105,'E','Y',108,'T','W','Q','(',113,')',96,8,'@',118,119,'F'
+  .byte     '&',28,'%','"','!','[',33,']','N',100,'M','?', 39,'R',105,'E','Y',108,'T','W','Q','(',113,')','''',8,'@',118,119,'F'
 //          121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150  
   .byte     'H','D',123,124,'G','S','A','L','J',';',  '3',  4,'K',134,135,'O',137,'P','U', 76,'I',142,143,'V', 17,'C', 19, 20,'B','X'
 //          151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180
@@ -1640,13 +1827,28 @@ stars                         // draw the stars
 stars_lp
   ldy sc_stars1,x
   cpy #255
-  beq wkey2
+  beq startupSound
   sta (sm_prt),y
   ldy sc_stars2,x  
   sta (temp_i),y 
   inx
   jmp stars_lp
 
+startupSound:
+  lda #20
+  jsr playTone_startup
+  lda #15
+  jsr playTone_startup
+  lda #20
+  jsr playTone_startup
+  lda #15
+  jsr playTone_startup
+  lda #12
+  jsr playTone_startup
+  lda #12
+  jsr playTone_startup
+   
+  
 wkey2  
   jsr animate_stars
   jsr readRTS                           // check for incomming data or reset request
@@ -1709,6 +1911,18 @@ animate_stars
   tax
   pla
   tay
+  rts
+
+playTone_startup:
+  // a = 1 to 63 (pitch)
+  sta ttone
+  stx DELAY
+  lda #%01000000
+  ora ttone
+  jsr chibiSound
+  jsr animate_stars
+  lda #0
+  jsr chibiSound
   rts
   
 //=========================================================================================================
@@ -1839,13 +2053,131 @@ readRTS:
 exitRTS
   rts
 
-
 // ----------------------------------------------------------------------
 // Reset the Atari
 // ----------------------------------------------------------------------
 resetAtari:  
    jmp $E477            // jump to reboot vector to restart the Atari.
 
+//----------------------------------------------------------------------
+// Hide or show the cursor
+//----------------------------------------------------------------------
+hide_cursor:
+  mva #1 curinh             // hide the cursor
+  jmp move_cursor
+  
+show_cursor:
+  mva #0 curinh             // hide the cursor
+move_cursor
+  lda #28 // up one line
+  jsr writeText             
+  lda #29 // down one line
+  jsr writeText             
+
+  rts
+
+//----------------------------------------------------------------------
+// Send the message
+// ----------------------------------------------------------------------
+send_message:
+  lda inhsend
+  cmp #1
+  bne sm_waitrtr
+  rts
+sm_waitrtr
+  jsr wait_for_RTR
+  lda #253
+  sta $D502
+  
+  jsr beep1
+  jsr hide_cursor
+  mwa  inputfield temp_i
+  dec temp_i  
+  ldy #0
+sendLines
+  jsr wait_for_RTR
+  lda (temp_i),y  
+  sta $D502
+  iny
+  cpy #120
+  bne sendLines 
+  
+  jsr wait_for_RTR
+  lda #128
+  sta $D502
+  mva #0 curinh               // enable the cursor again
+  jsr clearInputLines
+  rts
+  
+// ----------------------------------------------------------------------
+// check if the message is private  
+// ----------------------------------------------------------------------
+check_private:                                  
+   
+   // private messages start with @ and should only
+  lda SCREEN_ID             // be send from the private screen (Screen_id==3)
+  cmp #3
+  bne on_publ_screen  
+  jmp on_priv_screen          
+on_publ_screen                               
+  ldy #0                    // we are on the public screen, the message should
+  lda (inputfield),y        // not start with @    
+  cmp #32                   // 32 is the screen code for @
+  beq ch_go 
+  jmp check_p_exit
+ch_go
+  lda #1 
+  sta inhsend
+  sta doswitch
+  jsr errorSound
+  mva rowcrs p_cursor_y
+  mva colcrs p_cursor_x
+  jsr backup_screen
+  jsr clear_keyboard_and_screen
+  displayText pubPrivError, #8, #0
+  jsr bigdelay  
+  mva #<SCREEN_PUBL_BACKUP temp_i
+  mva #>SCREEN_PUBL_BACKUP temp_i+1
+  jsr restore_the_screen 
+  lda #1 
+  sta restoreMessageLines
+  jsr backup_message
+  jmp check_p_exit
+
+on_priv_screen
+  ldy #0                    // we are on the private screen, the message should
+  lda (inputfield),y        // start with @    
+  cmp #32
+  beq check_p_exit
+  mva #1 inhsend
+  jsr errorSound
+  mva rowcrs p_cursor_y
+  mva colcrs p_cursor_x
+  
+  jsr backup_screen
+  jsr clear_keyboard_and_screen
+  displayText privError, #8, #0
+  jsr bigdelay
+  mva #<SCREEN_PRIV_BACKUP temp_i
+  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  jsr restore_the_screen
+  mva p_cursor_y rowcrs
+  mva p_cursor_x colcrs
+  jsr show_cursor
+check_p_exit
+  rts
+
+bigdelay
+  lda #255
+  sta DELAY
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  jsr jdelay
+  rts
 // ----------------------------------------------------------------------
 // Calculate the addresses of where the messages will start
 // ----------------------------------------------------------------------
@@ -2069,6 +2401,16 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte "         Input Output Test Program         "
   .endl
   
+  .local pubPrivError //1234567890123456789012345678901234567890
+  .byte  '    Don''t send private messages from ',31,31,31,29
+  .byte  '           the public screen'
+  .endl
+  
+  .local privError //1234567890123456789012345678901234567890
+  .byte             ' Private messages should start with:',155
+  .byte             '         @[username]'
+  .endl
+  
   .local dl ; display list for the start screen
      .byte $70,$70,$70,$70,$70,$70,$70   
      .byte $f0          ; 8 blank lines + DLI on next scan line
@@ -2102,6 +2444,9 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------
+inhsend .byte 0
+doswitch .byte 0
+restoreMessageLines .byte 0
 blink   .byte 0,0
 blink2  .byte 0,0
 ddlist  .word 0,0
@@ -2168,12 +2513,14 @@ startLine1 .byte 0,0   // start address when message is 1 lines
 
 
 
-.align $400        
+.align $400           
 SCREEN_PUBL_BACKUP:
-   
-
+  
   org SCREEN_PUBL_BACKUP + 1024
 SCREEN_PRIV_BACKUP:
+ 
+  org SCREEN_PRIV_BACKUP + 1024
+MESSAGE_LINES_BACKUP:
    
         
  run init
