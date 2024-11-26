@@ -317,6 +317,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
+          
           if (first_check == 0) first_check = millis();
           // send urgent messages first
           doUrgentMessage();
@@ -456,7 +457,7 @@ void loop() {
 
           // Now send it with retry!
           bool sc = false;
-          int retry = 99;
+          int retry = 0;
           while (sc == false and retry < 2) {
             sendingMessage = 1;
             commandMessage.command = SendMessageToServerCommand;

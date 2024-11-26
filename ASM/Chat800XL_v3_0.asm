@@ -71,6 +71,7 @@ init
   sta input_fld
   lda sm_prt+1
   sta input_fld+1
+
   
 main   
   jsr startScreen  
@@ -133,8 +134,11 @@ mc_not_vice
   jsr clearInputLines
   
 chat_key_input
+  jsr hide_cursor
   jsr restore_message_lines
+
   jsr show_cursor
+  
   jsr text_input    // jump to the text input routine
 
 
@@ -199,31 +203,6 @@ shiftLine_loop         // temp_i is destination
 // ----------------------------------------------------------------------
 // backup and restore screens
 // ----------------------------------------------------------------------
-
-backup_message:
-  mva rowcrs m_cursor_y
-  mva colcrs m_cursor_x
-  jsr move_cursor_out_of_the_way
-  ldy #0
-ml_b_loop                   // backup message lines
-  lda (inputfield),y
-  sta MESSAGE_LINES_BACKUP,y
-  iny
-  cpy #121
-  bne ml_b_loop
-  rts
-  
-move_cursor_out_of_the_way:
-crs_up
-  lda #28
-  jsr writetext
-  lda rowcrs
-  cmp #20  
-  bne crs_up
-  jsr hide_cursor
-  rts
-
-
 backup_screen:
   mva rowcrs tempi
   jsr move_cursor_out_of_the_way
@@ -305,9 +284,8 @@ restore_priv_screen
   lda HAVE_P_BACKUP
   cmp #1
   beq do_p_restore
-  mva p_cursor_x colcrs    // restore the cursor position
-  mva p_cursor_y rowcrs    // restore the cursor position  
-
+//  mva p_cursor_x colcrs    // restore the cursor position
+//  mva p_cursor_y rowcrs    // restore the cursor position  
   jmp p_chat
 do_p_restore
   mva #<SCREEN_PRIV_BACKUP temp_i
@@ -369,6 +347,27 @@ restoreloop4
   bne restoreloop4
   rts
 
+backup_message:
+  jsr move_cursor_out_of_the_way
+  ldy #0
+ml_b_loop                   // backup message lines
+  lda (inputfield),y
+  sta MESSAGE_LINES_BACKUP,y
+  iny
+  cpy #120
+  bne ml_b_loop
+  rts
+  
+move_cursor_out_of_the_way:
+crs_up
+  lda #28
+  jsr writetext
+  lda rowcrs
+  cmp #20  
+  bne crs_up
+  jsr hide_cursor
+  rts
+  
 restore_message_lines:
   lda SCREEN_ID
   cmp #3
@@ -376,23 +375,27 @@ restore_message_lines:
   lda restoreMessageLines // the last 120 characters in the public backup needs to be restored
   cmp #1
   bne rml_exit
+  jsr move_cursor_out_of_the_way
   ldy #0
 rms_loop  
   lda MESSAGE_LINES_BACKUP,y
   sta (inputfield),y  
   iny
-  cpy #121
+  cpy #120
   bne rms_loop
   lda #0
   sta restoreMessageLines
-  mva m_cursor_y rowcrs 
-  mva m_cursor_x colcrs 
   jsr soundzipp
   jsr soundzipp
   jsr soundzipp
+  lda #29
+  jsr writetext
+  mva p_cursor_x colcrs    
+  mva p_cursor_y rowcrs
+  
 rml_exit
-
   rts
+  
 // ----------------------------------------------------------------------
 // Get the config status and the ESP Version
 // ----------------------------------------------------------------------
@@ -1211,7 +1214,7 @@ cpstart_exit
   jmp key_loop
   
 cpdelete  
-  cmp #8 ; delete
+  cmp #8                           // delete key is pressed
   beq handle_delete
    
 cpreturn
@@ -1272,6 +1275,7 @@ in_field
   jmp out_exit  
 
 handle_delete
+  
   lda MENU_ID
   cmp #10
   bcs del_in_field
@@ -1285,6 +1289,7 @@ hd_ok
   mva #255 $2fc                       // clear keyboard buffer 
   jmp key_loop
 delok  
+  
   lda #$1E                    // this is to work around a bug. backspace does not always work  
   jsr writeText               // when the cursor is at column zero.. this works around that
   lda colcrs                  // in stead of using backspace, we walk the cursor back,
@@ -1664,58 +1669,64 @@ kb2asci:
 getKey:   
   jsr readRTS                           // check for incomming data or reset request   
   lda $D01F                             // is one of the console keys pressed?
-  and #7
-  cmp #6
-  beq prSTART
-  cmp #5
-  beq prSELECT
-  cmp #3
-  beq prOPTION
-  
+  and #7                                //
+  cmp #6                                //
+  beq prSTART                           //
+  cmp #5                                //
+  beq prSELECT                          //
+  cmp #3                                //
+  beq prOPTION                          //
+                                        //
+chkBreak                                //
+  lda $0011                             // is the break key pressed?
+  cmp #0                                //
+  bne chkHelp                           //
+  rts                                   // return with zero
+                                        //
+chkHelp                                 //
   lda $02DC                             // is the HELP key pressed ?
-  and #1
-  cmp #1
-  beq prHELP
-  
+  and #1                                //
+  cmp #1                                //
+  beq prHELP                            //
   lda $2FC                              // is there a key in the keyboard buffer?
   cmp #255                              // 255 means no key
   beq exit_getkey                       // exit if no key
-
+                                        //
 keyConvert                              // convert the key code to ascii
   tay                                   //
   lda kb2asci,y                         //
 exit_getkey                             //
   rts                                   //
-  
-prOPTION
-  // wait until the key is released
-  lda $D01F
-  and #4
-  cmp #0
-  beq prOPTION
-  lda #251
-  rts
-prSELECT
-  // wait until the key is released
-  lda $D01F
-  and #2
-  cmp #0
-  beq prSELECT
-  lda #252
-  rts
-prSTART
-  // wait until the key is released
-  lda $D01F
-  and #1
-  cmp #0
-  beq prSTART
-  lda #253
-  rts
-prHelp
-  lda #0     // 
-  sta $02DC  // This address is latched and must be reset to zero after being read
-  lda #254
-  rts
+                                        //
+prOPTION                                //
+  lda $D01F                             // wait until the key is released
+  and #4                                //
+  cmp #0                                //
+  beq prOPTION                          //
+  lda #251                              //
+  rts                                   //
+                                        //
+prSELECT                                //
+  lda $D01F                             // wait until the key is released
+  and #2                                //
+  cmp #0                                //
+  beq prSELECT                          //
+  lda #252                              //
+  rts                                   //
+                                        //
+prSTART                                 //
+  lda $D01F                             // wait until the key is released
+  and #1                                //
+  cmp #0                                //
+  beq prSTART                           //
+  lda #253                              //
+  rts                                   //
+                                        //
+prHelp                                  //
+  lda #0                                // 
+  sta $02DC                             // This address is latched and must be 
+  lda #254                              // reset to zero after being read
+  rts                                   //
   
 //=========================================================================================================
 //    SUB ROUTINE TO SPLIT RXBUFFER
@@ -2067,13 +2078,12 @@ hide_cursor:
   jmp move_cursor
   
 show_cursor:
-  mva #0 curinh             // hide the cursor
+  mva #0 curinh             // show the cursor
 move_cursor
   lda #28 // up one line
   jsr writeText             
   lda #29 // down one line
   jsr writeText             
-
   rts
 
 //----------------------------------------------------------------------
