@@ -397,6 +397,20 @@ rml_exit
   rts
   
 // ----------------------------------------------------------------------
+// Get wifi status and fill variable WIFISTATUS
+// ----------------------------------------------------------------------
+get_wifi_status:
+  lda VICEMODE
+  cmp #1
+  bne get_wifi_status_cont
+  rts
+get_wifi_status_cont
+  lda #248 
+  jsr send_start_byte_ff    // the first byte in the RXBUFFER now contains 1 or 0
+  lda RXBUFFER              // get the first byte of the RXBUFFER
+  sta WIFISTATUS            // store the first byte as WIFISTATUS
+  rts
+// ----------------------------------------------------------------------
 // Get the config status and the ESP Version
 // ----------------------------------------------------------------------
 get_status: 
@@ -404,7 +418,7 @@ get_status:
   cmp #1
   beq exit_gs
 
-  lda #236                                      // ask Cartridge for the wifi credentials
+  lda #236                                      // ask Cartridge for the config status, server name and esp sketch version
   jsr send_start_byte_ff                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
   
   lda #1                                        // set the variables up for the splitbuffer command
@@ -468,8 +482,8 @@ main_menu:
   displayText MLINE_MAIN7, #17,#3
   displayText divider_line, #22,#0    ; draw the divider line
   displayText version_line, #23,#0    ; draw the version line
-  displayBuffer SWVERSION,#23,#24
-  displayBuffer version,#23,#14
+  displayBuffer SWVERSION,#23,#24,#0
+  displayBuffer version,#23,#14,#0
 main_menu_key_input:
   jsr getKey
   cmp #255
@@ -588,15 +602,15 @@ ul_start
 ul_novice
   lda TEMPI
   jsr send_start_byte_ff                      // RXBUFFER now contains the first group of users, 20
-  displayBuffer RXBUFFER,#4 ,#2
+  displayBuffer RXBUFFER,#4 ,#2,#0
 
   lda #233
   jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
-  displayBuffer RXBUFFER,#9 ,#2
+  displayBuffer RXBUFFER,#9 ,#2,#0
 
   lda #233
   jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
-  displayBuffer RXBUFFER,#14 ,#2
+  displayBuffer RXBUFFER,#14 ,#2,#0
 
   displayText divider_line, #22,#0            // draw the divider line
   displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
@@ -646,13 +660,13 @@ acc_novice
   jsr send_start_byte_ff                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
   mva #1 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#5 ,#14          // Display the buffers on screen (Mac address)
+  displayBuffer  SPLITBUFFER,#5 ,#14,#0       // Display the buffers on screen (Mac address)
   mva #2 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#7 ,#18          // Display the buffers on screen (registration id)
+  displayBuffer  SPLITBUFFER,#7 ,#18,#0       // Display the buffers on screen (registration id)
   mva #3 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#9 ,#12          // Display the buffers on screen (Nick Name)
+  displayBuffer  SPLITBUFFER,#9 ,#12,#0       // Display the buffers on screen (Nick Name)
   mva #4 splitIndex                           //
   jsr splitRXbuffer                           //
   lda SPLITBUFFER
@@ -751,7 +765,7 @@ server_setup:
   displayText divider_line, #10,#0            // draw the divider line
   displayText text_option_exit, #15,#3
   displayText divider_line, #22,#0            // draw the divider line
-  displayBuffer SERVERNAME,#5,#14
+  displayBuffer SERVERNAME,#5,#14,#0
   lda VICEMODE
   cmp #1
   beq svr_vice      
@@ -838,18 +852,18 @@ wifi_setup:
 wifi_get_cred
   lda #248                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff
-  displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the wifi status
+  displayBuffer  RXBUFFER,#23 ,#3,#1          // the RX buffer now contains the wifi status
   lda #251                                    // ask Cartridge for the wifi credentials
   jsr send_start_byte_ff                      // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
   mva #1 splitIndex                           //
   jsr splitRXbuffer                           //
-  displayBuffer  SPLITBUFFER,#5 ,#9           // Display the buffers on screen (SSID name)
+  displayBuffer  SPLITBUFFER,#5 ,#9,#0        // Display the buffers on screen (SSID name)
   mva #2 splitIndex
   jsr splitRXbuffer
-  displayBuffer  SPLITBUFFER,#7 ,#13          // Display the buffers on screen (SSID name)
+  displayBuffer  SPLITBUFFER,#7 ,#13,#0       // Display the buffers on screen (SSID name)
   mva #3 splitIndex
   jsr splitRXbuffer
-  displayBuffer  SPLITBUFFER,#9 ,#25          // Display the buffers on screen (SSID name)
+  displayBuffer  SPLITBUFFER,#9 ,#25,#0       // Display the buffers on screen (SSID name)
                                               //
 wf_vice                                       //
 wifi_input_fields                             //
@@ -2012,9 +2026,6 @@ db_next_char
   lda (textPointer),y  
   cmp #128
   beq db_exit
-//  cmp #1
-//  bne write_it
-//  lda #$1C // replace 1 with the line up command
 write_it
   jsr writeText
   inc character
@@ -2475,6 +2486,7 @@ CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
 TEMPI .byte 0
+WIFISTATUS .byte 0
 p_cursor_x .byte 0
 p_cursor_y .byte 0
 m_cursor_x .byte 0
@@ -2491,10 +2503,10 @@ startLine1 .byte 0,0   // start address when message is 1 lines
 // line = 0 - 23
 // column = 0,39
 // -----------------------------------
-.macro displayBuffer buffer,line,column
+.macro displayBuffer buffer,line,column,offset
   mva :line rowcrs 
   mva :column colcrs  
-  mva #0 character
+  mva :offset character
   lda #<(:buffer) 
   sta textPointer
   lda #>(:buffer)

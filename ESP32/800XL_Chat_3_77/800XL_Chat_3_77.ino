@@ -549,11 +549,11 @@ void loop() {
 
           if (!isWifiCoreConnected) {
             digitalWrite(CLED, LOW);
-            send_String_to_Bus("    Not Connected to Wifi         ");
+            send_String_to_Bus("0    Not Connected to Wifi         ");
           } else {
             wificonnected = 1;
             digitalWrite(CLED, HIGH);
-            String wifi_status = "Connected, ip: " + myLocalIp + "             ";
+            String wifi_status = "1Connected, ip: " + myLocalIp + "             ";
             wifi_status = wifi_status.substring(0, 35);
 
             send_String_to_Bus(wifi_status);
