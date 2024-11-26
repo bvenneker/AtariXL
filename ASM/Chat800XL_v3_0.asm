@@ -7,6 +7,22 @@
 
 // https://playermissile.com/dli_tutorial/ 
   
+// Auto updates!
+// Aantal prive berichten doorgeven
+// Bij onbekende user, bericht herstellen
+// Shift Clear, Control clear
+// Caps key geeft rare tekens (ook met shift en contrl)
+// Invert key geeft rare tekens
+// ESC key stuurt cursor omhoog!
+// TAB key geeft rare tekens
+// shift insert moet ook gewoon > geven
+// Return op onderste regel moet bericht verzenden
+// Control 7 geeft raar karakter
+// Control 1 geeft vastloper 
+// Control return geeft L (moet onmiddelijk verzenden)
+// 
+
+
 
 WSYNC     = $d40a
 NMIEN     = $d40e
@@ -350,8 +366,10 @@ restoreloop4
 backup_message:
   jsr move_cursor_out_of_the_way
   ldy #0
+  mwa inputfield temp_i
+  dec temp_i
 ml_b_loop                   // backup message lines
-  lda (inputfield),y
+  lda (temp_i),y
   sta MESSAGE_LINES_BACKUP,y
   iny
   cpy #120
@@ -372,14 +390,16 @@ restore_message_lines:
   lda SCREEN_ID
   cmp #3
   bne rml_exit
-  lda restoreMessageLines // the last 120 characters in the public backup needs to be restored
+  lda restoreMessageLines
   cmp #1
   bne rml_exit
   jsr move_cursor_out_of_the_way
   ldy #0
+  mwa inputfield temp_i
+  dec temp_i
 rms_loop  
   lda MESSAGE_LINES_BACKUP,y
-  sta (inputfield),y  
+  sta (temp_i),y  
   iny
   cpy #120
   bne rms_loop
@@ -2141,7 +2161,11 @@ check_private:
 on_publ_screen                               
   ldy #0                    // we are on the public screen, the message should
   mwa inputfield temp_i     // not start with @ 
+  lda VICEMODE
+  cmp #1
+  beq t11
   dec temp_i
+t11
   lda (temp_i),y           
   cmp #32                   // 32 is the screen code for @
   beq ch_go 
@@ -2168,7 +2192,11 @@ ch_go
 on_priv_screen
   ldy #0                    // we are on the private screen, the message should
   mwa inputfield temp_i     // start with @
+  lda VICEMODE
+  cmp #1
+  beq t12
   dec temp_i
+t12
   lda (temp_i),y            
   cmp #32
   beq check_p_exit
