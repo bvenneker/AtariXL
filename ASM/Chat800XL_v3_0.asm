@@ -780,7 +780,7 @@ server_setup:
   
   lda #237                                    // get server connection status
   jsr send_start_byte_ff
-  displayBuffer  RXBUFFER,#23 ,#3             // the RX buffer now contains the server status
+  displayBuffer  RXBUFFER,#23 ,#3,#0          // the RX buffer now contains the server status
   
 svr_vice 
 svr_input_fields                              //
