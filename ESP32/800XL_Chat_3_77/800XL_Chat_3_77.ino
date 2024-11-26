@@ -69,8 +69,7 @@ WiFiResponseMessage responseMessage;
 // Interrupt routine for IO1
 // *************************************************
 void IRAM_ATTR isr_io1() {
-
-  // This signal goes LOW when the Atari writes to (or reads from) the $D502 address.
+  // This signal goes LOW when the Atari writes to the $D502 address.
   ready_to_receive(false);
   ch = 0;
   ch = shiftIn(sdata, sclk1, MSBFIRST);
@@ -201,11 +200,11 @@ void setup() {
   ready_to_receive(false);
   ready_to_send(false);
   pinMode(RCLK, OUTPUT);
-  digitalWrite(RCLK, LOW);  // must be low
+  digitalWrite(RCLK, LOW);   // must be low
   pinMode(sclk1, OUTPUT);
-  digitalWrite(sclk1, LOW);  //data shifts to serial data output on the transition from low to high.
+  digitalWrite(sclk1, LOW);  // data shifts to serial data output on the transition from low to high.
   pinMode(sclk2, OUTPUT);
-  digitalWrite(sclk2, LOW);  //data shifts to serial data output on the transition from low to high.
+  digitalWrite(sclk2, LOW);  // data shifts to serial data output on the transition from low to high.
 
 
   //ready_to_receive(false);

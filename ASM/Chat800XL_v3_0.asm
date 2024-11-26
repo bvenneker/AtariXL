@@ -1980,8 +1980,8 @@ shift_l_exit                                      // here we exit the loop
 //=========================================================================================================
 //  SUB ROUTINE TO SHIFT THE STAR LINES TO RIGHT
 //=========================================================================================================
-TempCharR .byte 0
-TEMPB .byte 0
+TempCharR .byte 0                                 //
+TEMPB .byte 0                                     //
 shift_line_to_right:                              // a pointer to the memory address where the line we want to shift starts
                                                   // is stored in zero page address textPointer (2 bytes)
                                                   // shifting a line to the right is a bit more complicated as to shifting to the left.
@@ -2019,20 +2019,20 @@ shift_r_loop:                                     //
 // ----------------------------------------------------------------------
 // displayBuffer, used in macro displayRXBuffer
 // ----------------------------------------------------------------------
-displayBufferk:
-  mva #1 curinh  
-db_next_char  
-  ldy character
-  lda (textPointer),y  
-  cmp #128
-  beq db_exit
-write_it
-  jsr writeText
-  inc character
-  jmp db_next_char
-db_exit
-  rts
-
+displayBufferk:                                   // 
+  mva #1 curinh                                   // 
+db_next_char                                      // 
+  ldy character                                   // 
+  lda (textPointer),y                             //   
+  cmp #128                                        // 
+  beq db_exit                                     // 
+write_it                                          // 
+  jsr writeText                                   // 
+  inc character                                   // 
+  jmp db_next_char                                // 
+db_exit                                           // 
+  rts                                             // 
+                                                  // 
 // ----------------------------------------------------------------------
 // displayTextk, used in macro displayText
 // ----------------------------------------------------------------------
@@ -2084,19 +2084,19 @@ resetAtari:
 //----------------------------------------------------------------------
 // Hide or show the cursor
 //----------------------------------------------------------------------
-hide_cursor:
+hide_cursor:                //
   mva #1 curinh             // hide the cursor
-  jmp move_cursor
-  
-show_cursor:
+  jmp move_cursor           //
+                            //
+show_cursor:                //
   mva #0 curinh             // show the cursor
-move_cursor
-  lda #28 // up one line
-  jsr writeText             
-  lda #29 // down one line
-  jsr writeText             
-  rts
-
+move_cursor                 // move the cursor so it will actually become (in)visible
+  lda #28                   // up one line
+  jsr writeText             //
+  lda #29                   // down one line
+  jsr writeText             //
+  rts                       //
+                            //
 //----------------------------------------------------------------------
 // Send the message
 // ----------------------------------------------------------------------
@@ -2112,7 +2112,7 @@ sm_waitrtr
   
   jsr beep1
   jsr hide_cursor
-  mwa  inputfield temp_i
+  mwa inputfield temp_i
   dec temp_i  
   ldy #0
 sendLines
@@ -2133,16 +2133,16 @@ sendLines
 // ----------------------------------------------------------------------
 // check if the message is private  
 // ----------------------------------------------------------------------
-check_private:                                  
-   
-   // private messages start with @ and should only
-  lda SCREEN_ID             // be send from the private screen (Screen_id==3)
-  cmp #3
+check_private:                                       
+  lda SCREEN_ID             // private messages start with @ and should only
+  cmp #3                    // be send from the private screen (Screen_id==3)
   bne on_publ_screen  
   jmp on_priv_screen          
 on_publ_screen                               
   ldy #0                    // we are on the public screen, the message should
-  lda (inputfield),y        // not start with @    
+  mwa inputfield temp_i     // not start with @ 
+  dec temp_i
+  lda (temp_i),y           
   cmp #32                   // 32 is the screen code for @
   beq ch_go 
   jmp check_p_exit
@@ -2167,14 +2167,15 @@ ch_go
 
 on_priv_screen
   ldy #0                    // we are on the private screen, the message should
-  lda (inputfield),y        // start with @    
+  mwa inputfield temp_i     // start with @
+  dec temp_i
+  lda (temp_i),y            
   cmp #32
   beq check_p_exit
   mva #1 inhsend
   jsr errorSound
   mva rowcrs p_cursor_y
   mva colcrs p_cursor_x
-  
   jsr backup_screen
   jsr clear_keyboard_and_screen
   displayText privError, #8, #0
