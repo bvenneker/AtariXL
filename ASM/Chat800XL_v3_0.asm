@@ -5,11 +5,13 @@
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
 // https://grandideastudio.com/media/pp_atari8bit_schematic.pdf
 
-// https://playermissile.com/dli_tutorial/ 
-  
-// Auto updates!
+// TODO LIST  
+; Auto updates!
 // Aantal prive berichten doorgeven
-// Bij onbekende user, bericht herstellen
+// keep last PM user on screen after sending message
+; Bij onbekende user, bericht herstellen
+; Kleur veranderen!
+// escape moet exit menu zijn, altijd
 // Shift Clear, Control clear
 // Caps key geeft rare tekens (ook met shift en contrl)
 // Invert key geeft rare tekens
@@ -18,11 +20,9 @@
 // shift insert moet ook gewoon > geven
 // Return op onderste regel moet bericht verzenden
 // Control 7 geeft raar karakter
-// Control 1 geeft vastloper 
+; Control 1 = pause screen output. Kunnen we dat uitzetten? 
 // Control return geeft L (moet onmiddelijk verzenden)
 // 
-
-
 
 WSYNC     = $d40a
 NMIEN     = $d40e
@@ -97,6 +97,40 @@ main
   jsr are_we_in_the_matrix
   jsr get_status 
   jmp main_chat_screen
+
+// ----------------------------------------------------------------------
+// Print the last used pmuser on screen to start your private message
+// ----------------------------------------------------------------------
+printPMUSER:
+  lda SCREEN_ID
+  cmp #3
+  beq printpmcont 
+  rts
+printpmcont  
+  mwa inputfield temp_i
+  dec temp_i
+  ldy #0
+  sty colcrs
+  lda #28                   // move the cursor out of the way
+  jsr writeText             //
+ploop
+  lda PMUSER,y
+  cmp #128
+  beq exitPrPm
+  sta (temp_i),y
+  iny
+  inc colcrs
+  jmp ploop
+  
+exitPrPm    
+  lda #29                   // down one line
+  jsr writeText             //    
+  lda #32 // write the @ sign again (work around a bug)
+  ldy #0
+  sta (temp_i),y
+  lda #32
+  jsr writeText
+  rts
 // ----------------------------------------------------------------------
 // toggle between private and public messaging
 // ----------------------------------------------------------------------
@@ -114,6 +148,7 @@ toggle_screens:
 private_chat_screen:
   mva #3 SCREEN_ID
   jmp restore_screen
+  
 p_chat
   jsr clear_keyboard_and_screen
   displayText divider_line, #0,#0    ; draw the divider line
@@ -135,7 +170,6 @@ chat_screen
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
-  
   jsr errorSound
   
   displayText text_no_cartridge, #5,#6
@@ -151,11 +185,10 @@ mc_not_vice
   
 chat_key_input
   jsr hide_cursor
-  jsr restore_message_lines
-
+  jsr restore_message_lines  
   jsr show_cursor
-  
-  jsr text_input    // jump to the text input routine
+  jsr printPMUSER
+  jmp text_input    // jump to the text input routine
 
 
 
@@ -504,12 +537,13 @@ main_menu:
   displayText version_line, #23,#0    ; draw the version line
   displayBuffer SWVERSION,#23,#24,#0
   displayBuffer version,#23,#14,#0
+
 main_menu_key_input:
   jsr getKey
   cmp #255
   beq main_menu_key_input
   
-  cmp #$37                            // key 7 is pressed(exit)
+  cmp #251                            // Escape is pressed(exit)
   beq exit_main_menu
   
   cmp #$31                            // key 1 is pressed (wifi)
@@ -571,7 +605,7 @@ about_screen:
   
   displayText divider_line, #22,#0            // draw the divider line
   displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
-  jmp help_get_key_input                      // wait for user to press 7 to exit
+  jmp help_get_key_input                      // wait for user to press esc to exit
 // ----------------------------------------------------------------------
 // Help screen
 // ----------------------------------------------------------------------
@@ -587,9 +621,7 @@ help_screen:                                  //
                                               //
 help_get_key_input                            //
   jsr getKey                                  // wait for a key
-  cmp #251
-  beq hlp_exit
-  cmp #$37                                    // key 7 is pressed
+  cmp #251                                    // wait for ESC key
   bne help_get_key_input                      // if not, wait for key again
 hlp_exit
   mva #255 $2fc                               // clear keyboard buffer 
@@ -1114,7 +1146,9 @@ check_for_messages:
 check_cont  
   lda $14
   cmp #80
-  bcc check_exit    
+  bcs check_cont2
+  jmp check_exit    
+check_cont2
   lda #0
   sta $14
   ldy #0
@@ -1133,9 +1167,28 @@ check_ff
   jsr send_start_byte_ff  // RX buffer now contains a message or 128
   lda RXBUFFER
   cmp #128
-  beq check_exit
+  beq getNumberOfPrivateMessages
   jmp display_message
   
+getNumberOfPrivateMessages  
+  lda SCREEN_ID
+  cmp #3 
+  beq check_exit
+  lda #241
+  jsr send_start_byte_ff
+  mva colcrs savecc
+  mva rowcrs savecr
+  lda RXBUFFER
+  cmp #$2d
+  bne displayPMnumber
+  displayBuffer NOPMS, #20,#30,#0
+  jmp check_exit0
+displayPMnumber
+  displayBuffer RXBUFFER, #20,#30,#0
+check_exit0
+  mva savecc colcrs 
+  mva savecr rowcrs 
+  jsr show_cursor
 check_exit  
   rts
 
@@ -1211,6 +1264,14 @@ key_loop
   cmp #255
   beq key_loop
 
+cpClear
+  cmp #1
+  bne cpselect 
+  jsr clearInputLines
+  mva #255 $2fc                       // clear keyboard buffer
+  jmp key_loop
+  
+  
 cpselect
   cmp #252
   bne cpoption
@@ -1360,12 +1421,17 @@ handle_return
   bcs exit_on_return 
   lda rowcrs                          // ignore this key if we are on the last line
   cmp #23
-  beq up_exit 
+  beq handle_return_send 
   lda #$9b
   jmp chrout
 exit_on_return 
   rts 
 
+handle_return_send
+  mva #255 $2fc
+  jsr send_message
+  jmp key_loop
+  
 handle_up
   lda MENU_ID
   cmp #10
@@ -1651,7 +1717,7 @@ enddelay                                          //
 clearInputLines:  
   // fill the input lines with spaces  
   mva #21 rowcrs
-  mva #0 colcrs
+  mva #0  colcrs
   lda #32 // space character
   ldy #0
   sty temppos
@@ -1681,23 +1747,23 @@ cl_exit
 kb2asci: 
 // see https://www.atariarchives.org/c3ba/page004.php
 //       0   1   2  3 4  5   6   7   8  9 10   11 12  13  14  15  16 17 18  19 20 21  22  23  24  25  26  27 28  29  30
-  .byte 'l','j',';',3,4,'k','+','*','o',9,'p','u',13,'i','-','=','v',17,'c',19,20,'b','x','z','4',25,'3','6',28,'5','2'
+  .byte 'l','j',';',3,4,'k','+','*','o',9,'p','u',13,'i','-','=','v',17,'c',19,20,'b','x','z','4',25,'3','6',251,'5','2'
 //          31  32   33  34  35 36 37  38  39 40  41  42  43  44  45 46  47  48  49  50  51 52  53  54  55  56  57  58 59 60
-  .byte     '1',',',' ','.','n',36,'m','/',39,'r',41,'e','y', 44,'t','w','q','9',49,'0','7',8,'8','<','>','f','h','d',59,60
+  .byte     '1',',',' ','.','n',36,'m','/',' ','r',41,'e','y', ' ','t','w','q','9',49,'0','7',8,'8','<','>','f','h','d',59,' '
 //          61  62   63  64  65 66  67 68 69  70  71  72  73  74  75 76  77  78  79  80 81  82 83 84  85  86  87  88 89 90
-  .byte     'g','s','a','L','J',':', 3,68,'K','\','^','O',73,'P','U',76,'I','_','|','V',81,'C',83,84,'B','X','Z','$',89,'#'
+  .byte     'g','s','a','L','J',':', 3,68,'K','\','^','O',73,'P','U',253,'I','_','|','V',81,'C',83,84,'B','X','Z','$',89,'#'
 //          91  92  93  94  95  96 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 
-  .byte     '&',28,'%','"','!','[',33,']','N',100,'M','?', 39,'R',105,'E','Y',108,'T','W','Q','(',113,')','''',8,'@',118,119,'F'
+  .byte     '&',251,'%','"','!','[',33,']','N',100,'M','?',' ','R',105,'E','Y',' ','T','W','Q','(',113,')','''',8,'@',1,'>','F'
 //          121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150  
-  .byte     'H','D',123,124,'G','S','A','L','J',';',  '3',  4,'K',134,135,'O',137,'P','U', 76,'I',142,143,'V', 17,'C', 19, 20,'B','X'
+  .byte     'H','D',123,' ','G','S','A','L','J',';','3',  4,'K',134,135,'O',137,'P','U',253,'I',142,143,'V', 17,'C', 19, 20,'B','X'
 //          151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180
-  .byte     'Z','$',153,'#','&', 28,'%','"','!','[',161,']','N',164,'M','?', 39,'R',169,'E','Y',172,'T','W','Q','(',177,')',96,8
+  .byte     'Z','$',153,'#','&',251,'%','"',255,'[',161,']','N',164,'M','?',' ','R',169,'E','Y',' ','T','W','Q','(',177,')','''',8
 //          181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210
-  .byte     '@',182,183,'F','H','D',187,188,'G','S','A','L','J',';',195,196,197,198,199,'O',201,'P','U', 76,'I','_','|','V',209,210
+  .byte     '@',1,'>','F','H','D',187,' ','G','S','A','L','J',';',195,196,197,198,199,'O',201,'P','U',253,'I','_','|','V',209,210
 //          211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240
-  .byte     211,212,213,214,215,'$',217,'#','&',220,'%','"','!','[',225,']','N',228,'M','?',231,'R',233,'E','Y',236,'T','W','Q','('
+  .byte     211,212,213,214,215,'$',217,'#','&',251,'%','"','!','[',225,']','N',228,'M','?',' ','R',233,'E','Y',' ','T','W','Q','('
 //          241 242 243 244 245 246 247 248 249 250 251 252 253 254 255
-  .byte     241,')' ,96,  8,'@',246,247,'F','H','D',251, 60,'G','S','A'
+  .byte     241,')' ,'''',  8,'@',246,'>','F','H','D',251, ' ','G','S','A'
 
 
 getKey:   
@@ -1722,10 +1788,13 @@ chkHelp                                 //
   and #1                                //
   cmp #1                                //
   beq prHELP                            //
+
+  
+readKeyboardBuffer
   lda $2FC                              // is there a key in the keyboard buffer?
   cmp #255                              // 255 means no key
   beq exit_getkey                       // exit if no key
-                                        //
+
 keyConvert                              // convert the key code to ascii
   tay                                   //
   lda kb2asci,y                         //
@@ -2148,6 +2217,7 @@ sendLines
   sta $D502
   mva #0 curinh               // enable the cursor again
   jsr clearInputLines
+  jsr printPmUser  // print pmuser if we are on screen #3
   rts
   
 // ----------------------------------------------------------------------
@@ -2198,8 +2268,12 @@ on_priv_screen
   dec temp_i
 t12
   lda (temp_i),y            
-  cmp #32
-  beq check_p_exit
+  cmp #32           // yes, it starts with @ as it should
+ 
+  bne doNotSend 
+  jsr getPmUser    // store the name of the @user in a variable
+  jmp check_p_exit
+doNotSend
   mva #1 inhsend
   jsr errorSound
   mva rowcrs p_cursor_y
@@ -2228,6 +2302,28 @@ bigdelay
   jsr jdelay
   jsr jdelay
   rts
+
+getPmUser: // read the pm user from screen
+  lda (temp_i),y
+  sta PMUSER,y
+  cmp #0  // space
+  beq fin_pmuser
+  cmp #12  // comma
+  beq fin_pmuser
+  cmp #14  // full stop
+  beq fin_pmuser
+  cmp #26 // :
+  beq fin_pmuser
+  cmp #27 // ;
+  beq fin_pmuser
+  iny
+  jmp getPmUser
+fin_pmuser
+  iny
+  lda #128
+  sta PMUSER,y
+rts
+
 // ----------------------------------------------------------------------
 // Calculate the addresses of where the messages will start
 // ----------------------------------------------------------------------
@@ -2264,7 +2360,7 @@ calculate_screen_addresses:
 // ----------------------------------------------------------------
 version .byte '3.77',128
 version_date .byte '10/2024',128
-
+NOPMS .byte 18,18,18,18,18,18,18,18,128
 HAVE_M_BACKUP:                .byte 0             // 
 HAVE_P_BACKUP:                .byte 0             //
 HAVE_ML_BACKUP:               .byte 0             //
@@ -2323,7 +2419,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte 'USER LIST, inverted users are online'
   .endl
   .local text_user_list_foot
-  .byte '[p] previous  [n] next  [OPT] Exit'
+  .byte '[p] previous  [n] next  [ESC] Exit'
   .endl
   
   .local text_F5_toggle
@@ -2346,7 +2442,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .endl
 
   .local text_option_exit  
-  .byte '[OPTION] Exit'
+  .byte '[ESC] Exit'
   .endl  
 
   .local text_start_save_settings
@@ -2406,7 +2502,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte '[6] Help'
   .endl
   .local MLINE_MAIN7
-  .byte '[7] Exit Menu'
+  .byte '[ESC] Exit Menu'
   .endl
   
   .local text_help_screen
@@ -2418,7 +2514,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .endl
   
   .local text_help_screen2
-  .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with @Eliza'
+  .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with'
   .endl
   
   .local text_about_screen
@@ -2494,14 +2590,15 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------
-inhsend .byte 0
+PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128
+inhsend  .byte 0
 doswitch .byte 0
 restoreMessageLines .byte 0
-blink   .byte 0,0
-blink2  .byte 0,0
-ddlist  .word 0,0
-DELAY   .byte 0,0    
-z_as    .byte 0,0
+blink    .byte 0,0
+blink2   .byte 0,0
+ddlist   .word 0,0
+DELAY    .byte 0,0    
+z_as     .byte 0,0
 cursorphase  .byte 0,0
 temppos  .byte 0,0   
 RXBUFFER :250 .byte 128        

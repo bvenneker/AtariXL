@@ -748,10 +748,12 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 241 = Computer asks for the number of unread private messages
           // ------------------------------------------------------------------------------
-          if (pmCount > 10) pmCount = 10;
+          if (pmCount > 10) pmCount = 10;          
           String pm = String(pmCount);
           if (pmCount < 10) { pm = "0" + pm; }
-          if (pmCount == 0) pm = "--";
+          pm = "[PM:" + pm + "]";
+          if (pmCount == 0) pm = "--" ;
+          Serial.println(pm);
           send_String_to_Bus(pm);  // then send the number of messages as a string
           break;
         }
