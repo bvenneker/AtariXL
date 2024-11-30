@@ -9,8 +9,8 @@
 ; Auto updates!
 // Aantal prive berichten doorgeven
 // keep last PM user on screen after sending message
-; Bij onbekende user, bericht herstellen
-; Kleur veranderen!
+// Bij onbekende user, bericht herstellen
+// Kleur veranderen!
 // escape moet exit menu zijn, altijd
 // Shift Clear, Control clear
 // Caps key geeft rare tekens (ook met shift en contrl)
@@ -72,10 +72,9 @@ init
   adc #3                 ; add 3
   sta inputfield+1       ; store in $44.
   
-//  lda #4  
-//  sta color4
-  
-//  sta color2
+  lda #2  
+  sta color4
+  sta color2
   lda #0
   sta character  
   sta inhsend 
@@ -90,11 +89,12 @@ init
 
   
 main   
+  jsr are_we_in_the_matrix
   jsr startScreen  
   jsr hide_cursor
   jsr calculate_screen_addresses
   jsr clear_keyboard_and_screen
-  jsr are_we_in_the_matrix
+  
   jsr get_status 
   jmp main_chat_screen
 
@@ -131,6 +131,7 @@ exitPrPm
   lda #32
   jsr writeText
   rts
+
 // ----------------------------------------------------------------------
 // toggle between private and public messaging
 // ----------------------------------------------------------------------
@@ -532,7 +533,8 @@ main_menu:
   displayText MLINE_MAIN4, #11,#3
   displayText MLINE_MAIN5, #13,#3
   displayText MLINE_MAIN6, #15,#3
-  displayText MLINE_MAIN7, #17,#3
+  displayText MLINE_MAIN8, #17,#3
+  displayText MLINE_MAIN7, #19,#3
   displayText divider_line, #22,#0    ; draw the divider line
   displayText version_line, #23,#0    ; draw the version line
   displayBuffer SWVERSION,#23,#24,#0
@@ -567,8 +569,25 @@ cp_5
   jmp about_screen
 cp_6
   cmp #$36                            // key 6 is pressed (help)
-  bne no_match
+  bne cp_c  
   jmp help_screen
+
+cp_c                                  // change color
+  cmp #62                            // c
+  bne cp_x
+  inc color4
+  inc color4
+  inc color2
+  inc color2
+  jmp no_match
+cp_x
+  cmp #60
+  bne no_match
+  dec color4
+  dec color4
+  dec color2
+  dec color2
+  jmp no_match
   
 no_match  
   mva #255 $2fc                       // clear keyboard buffer 
@@ -578,10 +597,23 @@ exit_main_menu
   lda #0
   sta MENU_ID
   mva #255 $2fc                       // clear keyboard buffer
+
+  jsr sendScreenColor // send the screen color
   jmp restore_screen
   
-
-
+// ----------------------------------------------------------------------
+// Send screen color
+// ----------------------------------------------------------------------
+sendScreenColor:
+  jsr wait_for_RTR
+  lda #230
+  sta $D502
+  jsr wait_for_RTR
+  lda color4
+  sta $D502
+  jsr wait_for_RTR
+  rts
+  
 
 // ----------------------------------------------------------------------
 // Clear the keyboardbuffer and also clear the screen
@@ -1075,7 +1107,12 @@ check_matrix                                      //
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
   jsr jdelay                                      // and call the delay subroutine
-  jsr wait_for_RTS                                                // 
+  jsr wait_for_RTS
+  lda $D502
+  sta color4
+  sta color2
+//  jsr jdelay
+  jsr wait_for_RTS                                // 
   lda $D502                                       // read from cartridge
   cmp #128                                        // 
                                                   // 
@@ -1091,7 +1128,6 @@ exit_sim_check                                    //
     
 // ---------------------------------------------------------------------
 // Send a command byte to the cartridge and wait for response;
-// command in b                          ;
 // ---------------------------------------------------------------------
 send_start_byte_ff:                     //
   jsr wait_for_RTR
@@ -1155,7 +1191,18 @@ check_cont2
 
   lda VICEMODE
   cmp #1
-  beq check_exit
+  bne check_wifi 
+  jmp check_exit
+check_wifi
+  lda WIFISTATUS
+  cmp #49
+  beq check_priv_or_pub
+  jsr get_wifi_status
+  lda WIFISTATUS
+  cmp #1
+  beq check_priv_or_pub
+  jmp check_exit
+check_priv_or_pub
   lda SCREEN_ID  
   cmp #3  
   bne check_is_publ  
@@ -2207,6 +2254,7 @@ sm_waitrtr
 sendLines
   jsr wait_for_RTR
   lda (temp_i),y  
+  sta MESSAGE_LINES_BACKUP,y
   sta $D502
   iny
   cpy #120
@@ -2215,6 +2263,15 @@ sendLines
   jsr wait_for_RTR
   lda #128
   sta $D502
+    
+  lda #249 
+  jsr send_start_byte_ff   // get the result of the send action
+  lda RXBUFFER
+  cmp #0
+  beq sendWasGood 
+  jsr show_cursor
+  rts
+sendWasGood  
   mva #0 curinh               // enable the cursor again
   jsr clearInputLines
   jsr printPmUser  // print pmuser if we are on screen #3
@@ -2503,6 +2560,9 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .endl
   .local MLINE_MAIN7
   .byte '[ESC] Exit Menu'
+  .endl
+  .local MLINE_MAIN8
+  .byte '[< >] Change Color'
   .endl
   
   .local text_help_screen

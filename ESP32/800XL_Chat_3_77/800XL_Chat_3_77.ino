@@ -37,7 +37,7 @@ int userpageCount = 0;
 char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
-
+int screenColor = 0;
 
 WiFiCommandMessage commandMessage;
 WiFiResponseMessage responseMessage;
@@ -174,6 +174,8 @@ void setup() {
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
 
+  screenColor = settings.getUInt("scrcolor", 48);
+
   settings.end();
 
   // define inputs
@@ -200,7 +202,7 @@ void setup() {
   ready_to_receive(false);
   ready_to_send(false);
   pinMode(RCLK, OUTPUT);
-  digitalWrite(RCLK, LOW);   // must be low
+  digitalWrite(RCLK, LOW);  // must be low
   pinMode(sclk1, OUTPUT);
   digitalWrite(sclk1, LOW);  // data shifts to serial data output on the transition from low to high.
   pinMode(sclk2, OUTPUT);
@@ -306,7 +308,9 @@ void loop() {
     // 235 = Computer sends server configuration status
     // 234 = get user list first page
     // 233 = get user list next page
-    // 232 = Restart the computer (atari only)
+    // 232 = Restart the computer (Atari only)
+    // 231 = Do the update
+    // 230 = Computer sends screen color (Atari Only)
     // 228 = debug purposes
     // 128 = end marker, ignore
 
@@ -316,7 +320,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
-          
+
           if (first_check == 0) first_check = millis();
           // send urgent messages first
           doUrgentMessage();
@@ -383,7 +387,7 @@ void loop() {
           // start byte 253 = new chat message from Computer to database
           // ------------------------------------------------------------------------------
           // we expect a chat message from the Computer
-          
+
           receive_buffer_from_Bus(1);
 
           String toEncode = "";
@@ -393,7 +397,7 @@ void loop() {
           // Get the RecipientName
           // see if the message starts with '@'
           byte b = inbuffer[0];
-          if (b == '@') {            
+          if (b == '@') {
             for (int x = 1; x < 15; x++) {
               byte b = inbuffer[x];
               if (b != ' ' and b != ',' and b != ':' and b != ';' and b != '.') {
@@ -408,9 +412,9 @@ void loop() {
             }
           }
 
-          for (int x = mstart; x < inbuffersize-1; x++) {            
-            byte b = inbuffer[x];               
-            toEncode = (toEncode + inbuffer[x]);             
+          for (int x = mstart; x < inbuffersize - 1; x++) {
+            byte b = inbuffer[x];
+            toEncode = (toEncode + inbuffer[x]);
           }
 
           if (RecipientName != "") {
@@ -451,7 +455,7 @@ void loop() {
           toEncode.toCharArray(buff, buflen);
           Serial.print("toEncode=");
           Serial.println(toEncode);
-            
+
           String Encoded = my_base64_encode(buff, buflen);
 
           // Now send it with retry!
@@ -489,7 +493,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // 252 = Computer sends the new wifi network name (ssid) AND password AND time offset
           // ------------------------------------------------------------------------------
-           
+
           receive_buffer_from_Bus(3);
           // inbuffer now contains "SSID password timeoffset"
           char bns[inbuffersize + 1];
@@ -639,7 +643,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 246 = Computer sends a new chat server ip/fqdn
           // ------------------------------------------------------------------------------
-           
+
           receive_buffer_from_Bus(1);
 
           char bns[inbuffersize + 1];
@@ -666,7 +670,7 @@ void loop() {
           // start byte 245 = Computer checks if the Cartridge is connected at all.. or are we running in a simulator?
           // -----------------------------------------------------------------------------------------------------
           // receive the ROM version number
-          
+
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           // filter out any unwanted bytes, keep only ./01234567890
@@ -678,6 +682,8 @@ void loop() {
           String ns = bns;
           ns.replace(" ", "");
           romVersion = ns;
+          // send the screenColor
+          sendByte(screenColor);
           // respond with byte 128 to tell the computer the cartridge is present
           sendByte(128);
           pastMatrix = true;
@@ -695,7 +701,7 @@ void loop() {
           // start byte 244 = Computer sends the command to reset the cartridge to factory defaults
           // ---------------------------------------------------------------------------------
           // this will reset all settings
-          
+
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -748,11 +754,11 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 241 = Computer asks for the number of unread private messages
           // ------------------------------------------------------------------------------
-          if (pmCount > 10) pmCount = 10;          
+          if (pmCount > 10) pmCount = 10;
           String pm = String(pmCount);
           if (pmCount < 10) { pm = "0" + pm; }
           pm = "[PM:" + pm + "]";
-          if (pmCount == 0) pm = "--" ;
+          if (pmCount == 0) pm = "--";
           Serial.println(pm);
           send_String_to_Bus(pm);  // then send the number of messages as a string
           break;
@@ -853,7 +859,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 235 = Computer sends configuration status
           // ------------------------------------------------------------------------------
-          
+
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -895,7 +901,7 @@ void loop() {
         }
       case 231:
         {  // do the update!
-         
+
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -910,7 +916,24 @@ void loop() {
           }
           break;
         }
-
+      case 230:
+        {
+          dataFromBus=false;
+          ready_to_receive(true);          
+          while (dataFromBus == false) {
+            delayMicroseconds(2);
+          }
+          ready_to_receive(false);
+          screenColor = ch;
+          dataFromBus=false;
+          Serial.print("new color=");
+          Serial.println(screenColor);
+          settings.begin("mysettings", false);
+          settings.putUInt("scrcolor", screenColor);
+          settings.end();
+          
+          break;
+        }
       case 228:
         {
           // ------------------------------------------------------------------------------
@@ -964,7 +987,7 @@ void send_out_buffer_to_Bus() {
   int lastbyte = 0;
   // send the content of the outbuffer to the Bus
   for (int x = 0; x < outbuffersize - 1; x++) {
-    delayMicroseconds(500);    
+    delayMicroseconds(500);
     sendByte(outbuffer[x]);
     lastbyte = outbuffer[x];
   }
@@ -1121,7 +1144,7 @@ void doUrgentMessage() {
     outbuffer[0] = 1;
 
     for (int x = 1; x < outbuffersize; x++) {
-      int b = outbuffer[x] + 128; // add 128 to inverse the text
+      int b = outbuffer[x] + 128;  // add 128 to inverse the text
       if (b < 97) b = b - 32;
       if (b >= 160 and b < 192) b = b - 32;
       else if (b > 191 and b < 225) b = b - 32;
