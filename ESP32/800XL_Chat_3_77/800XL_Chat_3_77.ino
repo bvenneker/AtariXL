@@ -174,8 +174,8 @@ void setup() {
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
 
-  screenColor = settings.getUInt("scrcolor", 48);
-
+  screenColor = settings.getUInt("scrcolor", 0);
+  
   settings.end();
 
   // define inputs
@@ -272,7 +272,7 @@ void loop() {
 
     //
     if (wifiError and isWifiCoreConnected) {
-      urgentMessage = "[grn]Wifi connection restored.       ";
+      urgentMessage = "Wifi connection restored.       ";
       wifiError = false;
       wificonnected = 1;
     }
@@ -390,7 +390,7 @@ void loop() {
 
           receive_buffer_from_Bus(1);
 
-          String toEncode = "";
+          String toEncode = "[158]";
           String RecipientName = "";
           int mstart = 0;
 
@@ -447,6 +447,7 @@ void loop() {
             msgtype = "public";
           }
           toEncode.trim();
+
           int buflen = toEncode.length() + 1;
           Serial.print("Buffer len=");
           Serial.println(buflen);
@@ -682,8 +683,6 @@ void loop() {
           String ns = bns;
           ns.replace(" ", "");
           romVersion = ns;
-          // send the screenColor
-          sendByte(screenColor);
           // respond with byte 128 to tell the computer the cartridge is present
           sendByte(128);
           pastMatrix = true;
@@ -715,6 +714,7 @@ void loop() {
             settings.putString("server", "empty");
             settings.putString("configured", "empty");
             settings.putString("timeoffset", "+0");
+            settings.putUInt("scrcolor", 0);
             settings.end();
             // now reset the esp
             reboot();
@@ -806,10 +806,11 @@ void loop() {
           if (s != "") {
             Serial.print("new version available! :");
             Serial.println(newVersions);
-          } else {
-            Serial.print("No update :");
-            Serial.println(newVersions);
-          }
+            delay(10);
+            urgentMessage = "New version available, press [Option]";
+          } //else {
+            //Serial.println("No update :");            
+          //}
           break;
         }
       case 238:
@@ -876,6 +877,9 @@ void loop() {
           // we send a max of 12 users in one long string
           userpageCount = 0;
           String ul1 = userPages[userpageCount];
+          if (ul1.length()<2){
+
+          }
           Serial.println(ul1);
           send_String_to_Bus(ul1);
           userpageCount++;
@@ -885,11 +889,15 @@ void loop() {
         {
           // Computer asks for user list, second or third page.
           // we send a max of 14 users in one long string
+          Serial.print("PAGE COUNT =");
+          Serial.println(userpageCount);
           String ul1 = userPages[userpageCount];
-          Serial.println(ul1);
-          send_String_to_Bus(ul1);
+          if (ul1.length() >2){
+            Serial.println(ul1);
+            send_String_to_Bus(ul1);
+          } else send_String_to_Bus(" ");
           userpageCount++;
-          if (userpageCount > 9) userpageCount = 8;
+          if (userpageCount > 7) userpageCount = 7;
           break;
         }
       case 232:
@@ -901,11 +909,10 @@ void loop() {
         }
       case 231:
         {  // do the update!
-
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
-          String ns = bns;
+          String ns = bns;          
           if (ns.startsWith("UPDATE!")) {
             Serial.println("Update = GO <<<<");
             outByte(2);
@@ -1170,7 +1177,8 @@ void loadPrgfile() {
 
 
   Serial.println("------ LOAD PRG FILE ------");
-
+  delayMicroseconds(delayTime);
+  sendByte(screenColor);
   delayMicroseconds(delayTime);
   sendByte(lowByte(sizeof(prgfile) - 6));
   delayMicroseconds(delayTime);

@@ -16,6 +16,8 @@ targetHi    = $40
 sizeLow     = $41
 sizeHi      = $42
 DELAY       = $43
+COLOR2      = $2c6
+COLOR4      = $2c8
 
   org $A000      ; start address of RD5 Cartridge
   
@@ -61,18 +63,25 @@ send100
   lda #100
   sta $D502
 
+  
+// receive color  
+  jsr waitRTS
+  lda $D502
+  sta COLOR2
+  sta COLOR4
+  
   displayText t2, #2,#0
   
 // receive file size low byte
   jsr waitRTS
   lda $D502
   sta sizeLow
-//  displayText t3, #3,#0
+
 // receive file size high byte
   jsr waitRTS
   lda $D502
   sta sizeHi
-//  displayText t4, #3,#0
+
   lda #00
   sta targetLow
   lda #32

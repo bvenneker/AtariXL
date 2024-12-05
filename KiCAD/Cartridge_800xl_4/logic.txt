@@ -1,0 +1,17 @@
+
+address   A1 A0  RW
+
+$D500      0  0  1  Ready to receive
+$D501      0  1  1  Ready to send
+$D502      1  0  1  Read data from output buffer
+$D502      1  0  0  Write data to input buffer
+
+
+
+A1  A0  R/W  b02 /CCTL
+ 1   0   0   1   0   = /IO1
+ 1   0   1   1   0   = /IO2
+ 0   0   1   1   0   = D0 (RTR)
+ 0   1   1   1   0   = D1 (RTS)
+ 
+ 

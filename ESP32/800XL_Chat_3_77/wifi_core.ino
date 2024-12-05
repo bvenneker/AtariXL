@@ -126,10 +126,10 @@ bool SendMessageToServer(String Encoded, String RecipientName, int retryCount, b
 void get_full_userlist() {
   // this is for the user list in the menu (Who is on line?)
   // The second core calls this webpage so the main thread does not suffer performance
+  Serial.println("GET FULL USER LIST");
   for (int p = 0; p < 8; p++) {
     userPages[p] = getUserList(p);
-    char firstchar = userPages[p].charAt(0);
-    //if ((firstchar == 'x' or firstchar == 'u') == false) userPages[p] = "      ";
+    // char firstchar = userPages[p].charAt(0);    
   }
 }
 
@@ -313,14 +313,7 @@ void WifiCoreLoop(void* parameter) {
     myLocalIp=WiFi.localIP().toString();
 
     if (!getMessage) {                     // this is a wait loop
-      if (millis() > heartbeat + 25000) {  // while we do nothing we send a heartbeat signal to the server
-        heartbeat = millis();              // so that the web server knows you are still on line
-        if (!sendingMessage) {
-          SendMessageToServer("", "", 0, true);  // heartbeat repeats every 25 seconds
-        }
-        refreshUserPages = true;  // and refresh the user pages (who is online)
-      }
-      if (millis() > last_up_refresh + 30000 and pastMatrix and !sendingMessage) {
+      if (millis() > last_up_refresh + 10000 and pastMatrix and !sendingMessage) {
         refreshUserPages = true;
       }
       if (updateUserlist and !getMessage and pastMatrix and !sendingMessage) {
@@ -397,7 +390,7 @@ void softReset() {
 }
 
 String UpdateAvailable(){
-  String serverName = "http://" + server + "/checkUpdateForZX48.php";
+  String serverName = "http://" + server + "/checkUpdateForAtari.php";
   WiFiClient client;
   HTTPClient http;
   http.begin(client, serverName);
@@ -419,6 +412,7 @@ String UpdateAvailable(){
 }
 
 void doUpdate(){
+    ready_to_receive(true);
     updateProgress(1);
      
     NetworkClient client;
@@ -426,7 +420,7 @@ void doUpdate(){
     httpUpdate.onEnd(update_finished);
     httpUpdate.onProgress(update_progress);
     httpUpdate.onError(update_error);
-    httpUpdate.update(client, "http://www.chat64.nl/update/ZX48_Chat.bin");
+    httpUpdate.update(client, "http://www.chat64.nl/update/AtariXL_Chat.bin");
     
 }
 
@@ -454,11 +448,9 @@ void updateProgress(int p){
   if (lastp == p) return;
   lastp = p;
   // send the byte
-
+  Serial.println(p);
   digitalWrite(RCLK,LOW);
   shiftOut(oSdata,sclk2,MSBFIRST,p) ; 
   digitalWrite(RCLK,HIGH);
-
-  
 }
 

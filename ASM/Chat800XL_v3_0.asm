@@ -1,7 +1,7 @@
 // special characters: https://www.youtube.com/watch?v=fOrMwNBoC7E&list=PLmzSn5Wy9uF8nTsZBtdk1yHzFI5JXoUJT&index=7
 
 // https://www.atarimax.com/jindroush.atari.org/acarts.html
-// https://atariwiki.org/wiki/Wiki.jsp?page=Cartridges
+// https://atariwiki.org/wiki/Wiki.jsp?page=CartridgesexitVersions
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
 // https://grandideastudio.com/media/pp_atari8bit_schematic.pdf
 
@@ -11,6 +11,7 @@
 // keep last PM user on screen after sending message
 // Bij onbekende user, bericht herstellen
 // Kleur veranderen!
+
 // escape moet exit menu zijn, altijd
 // Shift Clear, Control clear
 // Caps key geeft rare tekens (ook met shift en contrl)
@@ -23,6 +24,10 @@
 ; Control 1 = pause screen output. Kunnen we dat uitzetten? 
 // Control return geeft L (moet onmiddelijk verzenden)
 // 
+// labels camelCase
+// variables ALLCAPS
+
+putchar_ptr = $346    ; pointer to print routine
 
 WSYNC     = $d40a
 NMIEN     = $d40e
@@ -37,55 +42,50 @@ COLOR0    = $02c4
 SDLSTL    = $0230
 CHARSET   = $2F4
 ROM_CHARS = $E000 
-POKEY  = $D200
+POKEY     = $D200
  
-color2 = $2c6
-color4 = $2c8
+COLOR2 = $2c6
+COLOR4 = $2c8
 
-input_fld = $15        // input field address $15 + $16
-temp_i = $17 
-temp_o = $19
-input_fld_len = $1A    // length of the input field
-text_color = $36
-character = $3f 
-textPointer = $40      // $40, $41 are a pointer. 
-textlen = $83
-rowcrs = $54          ; cursor row 
-colcrs = $55          ; cursor colm
-inputfield = $43      ; 43 and 44 hold a pointer to the main input field 
-start_color = $45
-splitIndex = $46
+TEXTBOX = $15        // input field address $15 + $16
+TEMP_I = $17 
+TEMP_O = $19
+TEXTBOXLEN = $1A    // length of the input field
+CHARINDEX = $3f 
+TEXTPOINTER = $40      // $40, $41 are a pointer. 
+TEXTLEN = $83
+ROWCRS = $54          ; cursor row 
+COLCRS = $55          ; cursor colm
+MESSAGEFIELD = $43      ; 43 and 44 hold a pointer to the main input field 
+ 
+SLITINDEX = $46
 
-putchar_ptr = $346    ; pointer to print routine
-curinh = $2F0         ; cursor inhibit, cursor is invisible if value is not zero
-sm_prt = $58          ; zero page pointer to screen memory
-sm_prt2= $59
+
+CURSORINH = $2F0            ; cursor inhibit, cursor is invisible if value is not zero
+SCREENMEMORYPOINTER = $58          ; zero page pointer to screen memory
+
 
   org $2000           ; program starts at $2000
 
 init
   mva #0 $52             ; set left margin to zero
-  lda sm_prt             ; load the lowbyte of the pointer for screen memory
+  lda SCREENMEMORYPOINTER             ; load the lowbyte of the pointer for screen memory
   adc #72                ; add 72
-  sta inputfield         ; store in $43 
-  lda sm_prt+1           ; load the high byte
+  sta MESSAGEFIELD         ; store in $43 
+  lda SCREENMEMORYPOINTER+1           ; load the high byte
   adc #3                 ; add 3
-  sta inputfield+1       ; store in $44.
-  
-  lda #2  
-  sta color4
-  sta color2
+  sta MESSAGEFIELD+1       ; store in $44.
   lda #0
-  sta character  
+  sta CHARINDEX  
   sta inhsend 
   sta doswitch
   sta restoreMessageLines
   sta MENU_ID
   sta SCREEN_ID
-  lda sm_prt
-  sta input_fld
-  lda sm_prt+1
-  sta input_fld+1
+  lda SCREENMEMORYPOINTER
+  sta TEXTBOX
+  lda SCREENMEMORYPOINTER+1
+  sta TEXTBOX+1
 
   
 main   
@@ -101,35 +101,35 @@ main
 // ----------------------------------------------------------------------
 // Print the last used pmuser on screen to start your private message
 // ----------------------------------------------------------------------
-printPMUSER:
+print_pm_user:
   lda SCREEN_ID
   cmp #3
-  beq printpmcont 
+  beq print_pm_continue 
   rts
-printpmcont  
-  mwa inputfield temp_i
-  dec temp_i
+print_pm_continue
+  mwa MESSAGEFIELD TEMP_I
+  dec TEMP_I
   ldy #0
-  sty colcrs
+  sty COLCRS
   lda #28                   // move the cursor out of the way
-  jsr writeText             //
+  jsr write_text             //
 ploop
   lda PMUSER,y
   cmp #128
-  beq exitPrPm
-  sta (temp_i),y
+  beq exit_print_pm
+  sta (TEMP_I),y
   iny
-  inc colcrs
+  inc COLCRS
   jmp ploop
   
-exitPrPm    
+exit_print_pm    
   lda #29                   // down one line
-  jsr writeText             //    
+  jsr write_text             //    
   lda #32 // write the @ sign again (work around a bug)
   ldy #0
-  sta (temp_i),y
+  sta (TEMP_I),y
   lda #32
-  jsr writeText
+  jsr write_text
   rts
 
 // ----------------------------------------------------------------------
@@ -137,7 +137,7 @@ exitPrPm
 // ----------------------------------------------------------------------
 toggle_screens:  
   jsr backup_screen                // make a backup of the current screen
-  jsr soundzipp
+  jsr sound_zipp
   lda SCREEN_ID
   cmp #3
   bne private_chat_screen
@@ -152,9 +152,9 @@ private_chat_screen:
   
 p_chat
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0    ; draw the divider line
-  displayText text_F5_toggle, #1,#0    ; draw the menu title
-  displayText divider_line, #2,#0    ; draw the divider line
+  displayText DIVIDER_LINE, #0,#0    ; draw the divider line
+  displayText TEXT_F5_TOGGLE, #1,#0    ; draw the menu title
+  displayText DIVIDER_LINE, #2,#0    ; draw the divider line
   jmp chat_screen
  
   
@@ -171,24 +171,27 @@ chat_screen
   lda VICEMODE
   cmp #1  
   bne mc_not_vice
-  jsr errorSound
+  lda #4
+  sta COLOR4
+  sta COLOR2
+  jsr error_sound
   
-  displayText text_no_cartridge, #5,#6
+  displayText TEXT_NO_CARTRIDGE, #5,#6
   
   
 mc_not_vice
 
   mva #255 $2fc                       ; clear keyboard buffer
-  mva #0 colcrs                       ; set cursor row position to zero  
-  displayText divider_line, #20,#0    ; draw the divider line
+  mva #0 COLCRS                       ; set cursor row position to zero  
+  displayText DIVIDER_LINE, #20,#0    ; draw the divider line
 
-  jsr clearInputLines
+  jsr clear_input_lines
   
 chat_key_input
   jsr hide_cursor
   jsr restore_message_lines  
   jsr show_cursor
-  jsr printPMUSER
+  jsr print_pm_user
   jmp text_input    // jump to the text input routine
 
 
@@ -201,60 +204,60 @@ shift_screen_up:
   cmp #3                   // in private screen, we must ignore the first 3 lines
   bne shift_public 
   ldx #16
-  mwa sm_prt temp_i        // temp_i points to line 0  
-  mwa sm_prt temp_o
-  lda temp_i
+  mwa SCREENMEMORYPOINTER TEMP_I        // TEMP_I points to line 0  
+  mwa SCREENMEMORYPOINTER TEMP_O
+  lda TEMP_I
   adc #120
-  sta temp_i               // temp_i now points to line 3
-  lda temp_o
+  sta TEMP_I               // TEMP_I now points to line 3
+  lda TEMP_O
   adc #160
-  sta temp_o               // temp_o points to line 4
+  sta TEMP_O               // TEMP_O points to line 4
   jmp sh_up_d              // start shifting! 
   
 shift_public    
   ldx #19                  // in public chat we shift from line 0
-  mwa sm_prt temp_i        // temp_i points to line 0
-  mwa sm_prt temp_o
-shiftLoop
+  mwa SCREENMEMORYPOINTER TEMP_I        // TEMP_I points to line 0
+  mwa SCREENMEMORYPOINTER TEMP_O
+shift_loop
   clc
-  lda temp_o               //
+  lda TEMP_O               //
   adc #40                  // add 40 to go to the next line
-  sta temp_o               // textPointer points to line 1
+  sta TEMP_O               // TEXTPOINTER points to line 1
   bcs up_hb                // we there was an overflow, increase the highbyte also
   jmp sh_up_d
 up_hb
-  inc temp_o+1             // increase highbyte
+  inc TEMP_O+1             // increase highbyte
 sh_up_d   
-  jsr shiftLine
-  mwa temp_o temp_i
+  jsr shift_line
+  mwa TEMP_O TEMP_I
   dex    
-  bne shiftLoop
-  mwa startLine1 temp_i    // clear the last line
+  bne shift_loop
+  mwa STARTLINE1 TEMP_I    // clear the last line
   ldy #39
   lda #0  
 line_clear_loop    
-  sta (temp_i),y
+  sta (TEMP_I),y
   dey
   bne line_clear_loop
 
   rts
 
 
-shiftLine:             // this routine shifts one line up
-  ldy #0               // temp_o is source
-shiftLine_loop         // temp_i is destination
-  lda (temp_o),y  
-  sta (temp_i),y
+shift_line:             // this routine shifts one line up
+  ldy #0               // TEMP_O is source
+shift_line_loop         // TEMP_I is destination
+  lda (TEMP_O),y  
+  sta (TEMP_I),y
   iny
   cpy #40
-  bne shiftLine_loop
+  bne shift_line_loop
   rts
 
 // ----------------------------------------------------------------------
 // backup and restore screens
 // ----------------------------------------------------------------------
 backup_screen:
-  mva rowcrs tempi
+  mva ROWCRS TEMPBYTE
   jsr move_cursor_out_of_the_way
   lda MENU_ID
   cmp #0
@@ -268,59 +271,59 @@ bs_c
   rts
 
 backup_priv_screen
-  mva colcrs p_cursor_x
-  mva tempi p_cursor_y
+  mva COLCRS p_cursor_x
+  mva TEMPBYTE p_cursor_y
   mva #1 HAVE_P_BACKUP
-  mva #<SCREEN_PRIV_BACKUP temp_i
-  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  mva #<SCREEN_PRIV_BACKUP TEMP_I
+  mva #>SCREEN_PRIV_BACKUP TEMP_I+1
   jsr backup_the_screen 
   rts
   
 backup_publ_screen
-  mva colcrs m_cursor_x
-  mva tempi m_cursor_y
+  mva COLCRS MCURSORX
+  mva TEMPBYTE MCURSORY
   mva #1 HAVE_M_BACKUP  
-  mva #<SCREEN_PUBL_BACKUP temp_i
-  mva #>SCREEN_PUBL_BACKUP temp_i+1
+  mva #<SCREEN_PUBL_BACKUP TEMP_I
+  mva #>SCREEN_PUBL_BACKUP TEMP_I+1
   jsr backup_the_screen 
   rts
   
 backup_the_screen
-  mwa sm_prt textPointer    
+  mwa SCREENMEMORYPOINTER TEXTPOINTER    
   ldy #0  
-backuploop1
-  lda (textPointer),y
-  sta (temp_i),y
+backup_loop1
+  lda (TEXTPOINTER),y
+  sta (TEMP_I),y
   iny
   cpy #0
-  bne backuploop1
+  bne backup_loop1
    
-  inc textPointer+1
-  inc temp_i+1
-backuploop2
-  lda (textPointer),y
-  sta (temp_i),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+backup_loop2
+  lda (TEXTPOINTER),y
+  sta (TEMP_I),y
   iny
   cpy #0
-  bne backuploop2
+  bne backup_loop2
   
-  inc textPointer+1
-  inc temp_i+1
-backuploop3
-  lda (textPointer),y
-  sta (temp_i),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+backup_loop3
+  lda (TEXTPOINTER),y
+  sta (TEMP_I),y
   iny
   cpy #0
-  bne backuploop3
+  bne backup_loop3
   
-  inc textPointer+1
-  inc temp_i+1
-backuploop4
-  lda (textPointer),y
-  sta (temp_i),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+backup_loop4
+  lda (TEXTPOINTER),y
+  sta (TEMP_I),y
   iny
   cpy #192
-  bne backuploop4
+  bne backup_loop4
   rts
   
   
@@ -334,76 +337,76 @@ restore_priv_screen
   lda HAVE_P_BACKUP
   cmp #1
   beq do_p_restore
-//  mva p_cursor_x colcrs    // restore the cursor position
-//  mva p_cursor_y rowcrs    // restore the cursor position  
+//  mva p_cursor_x COLCRS    // restore the cursor position
+//  mva p_cursor_y ROWCRS    // restore the cursor position  
   jmp p_chat
 do_p_restore
-  mva #<SCREEN_PRIV_BACKUP temp_i
-  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  mva #<SCREEN_PRIV_BACKUP TEMP_I
+  mva #>SCREEN_PRIV_BACKUP TEMP_I+1
   jsr restore_the_screen 
-  mva p_cursor_x colcrs    // restore the cursor position
-  mva p_cursor_y rowcrs    // restore the cursor position  
+  mva p_cursor_x COLCRS    // restore the cursor position
+  mva p_cursor_y ROWCRS    // restore the cursor position  
   jmp chat_key_input
   
 restore_publ_screen
   lda HAVE_M_BACKUP
   cmp #1
-  beq do_M_restore
+  beq do_m_restore
   jmp m_chat
-do_M_restore
-  mva #<SCREEN_PUBL_BACKUP temp_i
-  mva #>SCREEN_PUBL_BACKUP temp_i+1
+do_m_restore
+  mva #<SCREEN_PUBL_BACKUP TEMP_I
+  mva #>SCREEN_PUBL_BACKUP TEMP_I+1
   jsr restore_the_screen 
-  mva m_cursor_x colcrs   // restore the cursor position
-  mva m_cursor_y rowcrs   // restore the cursor position
+  mva MCURSORX COLCRS   // restore the cursor position
+  mva MCURSORY ROWCRS   // restore the cursor position
   
   jmp chat_key_input
 
 restore_the_screen
-  mwa sm_prt textPointer
+  mwa SCREENMEMORYPOINTER TEXTPOINTER
   ldy #0  
-restoreloop1
-  lda (temp_i),y
-  sta (textPointer),y
+restore_loop1
+  lda (TEMP_I),y
+  sta (TEXTPOINTER),y
   iny
   cpy #0
-  bne restoreloop1
+  bne restore_loop1
   
-  inc textPointer+1
-  inc temp_i+1
-restoreloop2
-  lda (temp_i),y
-  sta (textPointer),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+restore_loop2
+  lda (TEMP_I),y
+  sta (TEXTPOINTER),y
   iny
   cpy #0
-  bne restoreloop2
+  bne restore_loop2
 
-  inc textPointer+1
-  inc temp_i+1
-restoreloop3
-  lda (temp_i),y
-  sta (textPointer),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+restore_loop3
+  lda (TEMP_I),y
+  sta (TEXTPOINTER),y
   iny
   cpy #0
-  bne restoreloop3
+  bne restore_loop3
 
-  inc textPointer+1
-  inc temp_i+1
-restoreloop4
-  lda (temp_i),y
-  sta (textPointer),y
+  inc TEXTPOINTER+1
+  inc TEMP_I+1
+restore_loop4
+  lda (TEMP_I),y
+  sta (TEXTPOINTER),y
   iny
   cpy #192
-  bne restoreloop4
+  bne restore_loop4
   rts
 
 backup_message:
   jsr move_cursor_out_of_the_way
   ldy #0
-  mwa inputfield temp_i
-  dec temp_i
+  mwa MESSAGEFIELD TEMP_I
+  dec TEMP_I
 ml_b_loop                   // backup message lines
-  lda (temp_i),y
+  lda (TEMP_I),y
   sta MESSAGE_LINES_BACKUP,y
   iny
   cpy #120
@@ -413,8 +416,8 @@ ml_b_loop                   // backup message lines
 move_cursor_out_of_the_way:
 crs_up
   lda #28
-  jsr writetext
-  lda rowcrs
+  jsr write_text
+  lda ROWCRS
   cmp #20  
   bne crs_up
   jsr hide_cursor
@@ -429,23 +432,23 @@ restore_message_lines:
   bne rml_exit
   jsr move_cursor_out_of_the_way
   ldy #0
-  mwa inputfield temp_i
-  dec temp_i
+  mwa MESSAGEFIELD TEMP_I
+  dec TEMP_I
 rms_loop  
   lda MESSAGE_LINES_BACKUP,y
-  sta (temp_i),y  
+  sta (TEMP_I),y  
   iny
   cpy #120
   bne rms_loop
   lda #0
   sta restoreMessageLines
-  jsr soundzipp
-  jsr soundzipp
-  jsr soundzipp
+  jsr sound_zipp
+  jsr sound_zipp
+  jsr sound_zipp
   lda #29
-  jsr writetext
-  mva p_cursor_x colcrs    
-  mva p_cursor_y rowcrs
+  jsr write_text
+  mva p_cursor_x COLCRS    
+  mva p_cursor_y ROWCRS
   
 rml_exit
   rts
@@ -460,7 +463,7 @@ get_wifi_status:
   rts
 get_wifi_status_cont
   lda #248 
-  jsr send_start_byte_ff    // the first byte in the RXBUFFER now contains 1 or 0
+  jsr sendStartByte    // the first byte in the RXBUFFER now contains 1 or 0
   lda RXBUFFER              // get the first byte of the RXBUFFER
   sta WIFISTATUS            // store the first byte as WIFISTATUS
   rts
@@ -473,16 +476,16 @@ get_status:
   beq exit_gs
 
   lda #236                                      // ask Cartridge for the config status, server name and esp sketch version
-  jsr send_start_byte_ff                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
+  jsr sendStartByte                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
   
   lda #1                                        // set the variables up for the splitbuffer command
-  sta splitIndex                                // we need the first element, so store #1 in splitIndex
+  sta SLITINDEX                                // we need the first element, so store #1 in SLITINDEX
   jsr splitRXbuffer                             // and call spilt buffer
   lda SPLITBUFFER                               // SPLITBUFFER NOW CONTAINS THE CONFIG_STATUS
   sta CONFIG_STATUS                             // this is only one character, store it in config_status   
                                                 //
   lda #2                                        // we need the second element out of the rxbuffer   
-  sta splitIndex                                // so put #2 in splitIndex and jump to split buffer   
+  sta SLITINDEX                                // so put #2 in SLITINDEX and jump to split buffer   
   jsr splitRXbuffer                             // SPLITBUFFER NOW CONTAINS THE SERVERNAME
                                                 // The servername is multiple characters so we need a loop to copy it to                                                  
   ldx #0                                        // the server name variable   
@@ -499,7 +502,7 @@ fin_server_name
   lda #128                                      // finish the servername variable with byte 128   
   sta SERVERNAME,x                              //    
   lda #3                                        // now get the third element from the rx buffer    
-  sta splitIndex                                // so put #3 in splitIndex and jump to split buffer    
+  sta SLITINDEX                                // so put #3 in SLITINDEX and jump to split buffer    
   jsr splitRXbuffer                             // SPLITBUFFER NOW CONTAINS THE SWVERSION
                                                 // The swversion is multiple characters so we need a loop
   ldx #0                                        // to copy the text to the SWVERSION variable   
@@ -522,11 +525,12 @@ exit_gs
 // Main Menu
 // ----------------------------------------------------------------------
 main_menu:
+  jsr displayUpdateScreen
   mva #10 MENU_ID
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0    ; draw the divider line
+  displayText DIVIDER_LINE, #0,#0    ; draw the divider line
   displayText text_main_menu, #1,#15    ; draw the menu title
-  displayText divider_line, #2,#0    ; draw the divider line
+  displayText DIVIDER_LINE, #2,#0    ; draw the divider line
   displayText MLINE_MAIN1, #5,#3
   displayText MLINE_MAIN2, #7,#3
   displayText MLINE_MAIN3, #9,#3
@@ -535,10 +539,10 @@ main_menu:
   displayText MLINE_MAIN6, #15,#3
   displayText MLINE_MAIN8, #17,#3
   displayText MLINE_MAIN7, #19,#3
-  displayText divider_line, #22,#0    ; draw the divider line
-  displayText version_line, #23,#0    ; draw the version line
+  displayText DIVIDER_LINE, #22,#0    ; draw the divider line
+  displayText VERSION_LINE, #23,#0    ; draw the version line
   displayBuffer SWVERSION,#23,#24,#0
-  displayBuffer version,#23,#14,#0
+  displayBuffer VERSION,#23,#14,#0
 
 main_menu_key_input:
   jsr getKey
@@ -575,18 +579,18 @@ cp_6
 cp_c                                  // change color
   cmp #62                            // c
   bne cp_x
-  inc color4
-  inc color4
-  inc color2
-  inc color2
+  inc COLOR4
+  inc COLOR4
+  inc COLOR2
+  inc COLOR2
   jmp no_match
 cp_x
   cmp #60
   bne no_match
-  dec color4
-  dec color4
-  dec color2
-  dec color2
+  dec COLOR4
+  dec COLOR4
+  dec COLOR2
+  dec COLOR2
   jmp no_match
   
 no_match  
@@ -609,19 +613,119 @@ sendScreenColor:
   lda #230
   sta $D502
   jsr wait_for_RTR
-  lda color4
+  lda COLOR4
   sta $D502
   jsr wait_for_RTR
   rts
   
+// ----------------------------------------------------------------------
+// Update screen, shown if there is a new firmware version available
+// ----------------------------------------------------------------------
 
+displayUpdateScreen:
+  lda NEWESP
+  cmp #128                   // if newesp version starts with 128
+  bne contUpdateScreen       // then there is no new version to show
+  rts                        // so return without further action
+contUpdateScreen
+  mva #19 MENU_ID
+  jsr clear_keyboard_and_screen
+  displayText DIVIDER_LINE, #0,#0    ; draw the divider line
+  displayText TEXT_UPDATE_TITLE, #1,#10    ; draw the menu title
+  displayText DIVIDER_LINE, #2,#0    ; draw the divider line
+  displayText TEXT_NEW_VERSIONS,#5,#0
+  displayText TEXT_NEW_ROM, #8,#2
+  displayText TEXT_NEW_ESP, #9,#2
+  displayBuffer NEWROM, #8,#11,#0
+  displayBuffer NEWESP, #9,#11,#0
+
+  displayText DIVIDER_LINE, #22,#0    ; draw the divider line
+  displayText VERSION_LINE, #23,#0    ; draw the version line
+  displayBuffer SWVERSION,#23,#24,#0
+  displayBuffer VERSION,#23,#14,#0
+ 
+updateScreenKeyInput:
+  jsr getKey
+  cmp #255
+  beq updateScreenKeyInput
+  
+  cmp #251                            // Escape is pressed(exit)
+  beq exitUpdateScreen
+  
+  cmp #121                            // key y is pressed 
+  bne cp_n 
+  jmp doUpdate
+cp_n
+  cmp #110
+  bne updateScreenKeyInput 
+  lda #128  // key n is pressed
+  sta NEWESP
+  
+exitUpdateScreen
+  rts
+
+doUpdate  
+  displayText TEXT_INSTALLING, #11,#2
+  displayBuffer UPDATEBOX, #13,#2,#0
+  
+  jsr WAIT_FOR_RTR
+  lda #231
+  sta $D502
+  ldy #0
+confirmUpd
+  jsr WAIT_FOR_RTR
+  lda CONFIRMUPDATE,y
+  sta $D502
+  iny
+  cmp #128
+  bne confirmUpd 
+  jsr WAIT_FOR_RTR
+updt
+  lda #100
+  sta DELAY
+  jsr jdelay
+  lda $D502
+  cmp #32
+  beq updRest
+  sta TEMPBYTE
+  
+pbar    
+  lda #160
+  jsr write_text
+  dec TEMPBYTE
+  lda TEMPBYTE  
+  cmp #0
+  bne pbar
+  
+  lda #$9b // go to next line
+  jsr write_text
+  lda #$1c // up
+  jsr write_text
+  lda #$1f // right
+  jsr write_text
+  lda #$1f // right
+  jsr write_text
+  lda #$1f // right
+  jsr write_text
+  lda #$1f // right
+  jsr write_text    
+  jmp updt
+  rts
+
+updRest  
+  displayText UPDATEDONE,#17,#2
+  lda #255
+  sta DELAY
+  jsr jdelay
+  jsr jdelay
+  jmp $E477
 // ----------------------------------------------------------------------
 // Clear the keyboardbuffer and also clear the screen
 // ----------------------------------------------------------------------
 clear_keyboard_and_screen
   mva #255 $2fc                               // clear keyboard buffer
   lda #$7D                                    // load clear screen command
-  jsr writeText                               // print it to screen
+  jsr write_text                               // print it to screen
   rts
 
 // ----------------------------------------------------------------------
@@ -630,12 +734,12 @@ clear_keyboard_and_screen
 about_screen:
   mva #15 MENU_ID
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText text_about_screen, #1,#15       // draw the menu title and text
-  displayText text_about_screen2, #10,#0       // draw the more text
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText TEXT_ABOUT_SCREEN, #1,#15       // draw the menu title and text
+  displayText TEXT_ABOUT_SCREEN2, #10,#0       // draw the more text
   
-  displayText divider_line, #22,#0            // draw the divider line
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
   displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
   jmp help_get_key_input                      // wait for user to press esc to exit
 // ----------------------------------------------------------------------
@@ -644,11 +748,11 @@ about_screen:
 help_screen:                                  //
   mva #16 MENU_ID                             //
   jsr clear_keyboard_and_screen               //
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText text_help_screen, #1,#15        // draw the menu title and text
-  displayText text_help_screen2, #10,#0        // draw more text
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText divider_line, #22,#0            // draw the divider line
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText TEXT_HELP_SCREEN, #1,#15        // draw the menu title and text
+  displayText TEXT_HELP_SCREEN2, #10,#0        // draw more text
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
   displayText MLINE_MAIN7, #23,#1             // draw the menu on the bottom line
                                               //
 help_get_key_input                            //
@@ -670,34 +774,34 @@ hlp_exit
 // ----------------------------------------------------------------------
 user_list:
   mva #14 MENU_ID
-  mva #234 TEMPI
+  mva #234 TEMPBYTE
 ul_start
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText text_user_list, #1,#1          // draw the menu title
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText divider_line, #22,#0            // draw the divider line
-  displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText TEXT_USER_LIST, #1,#1          // draw the menu title
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
+  displayText TEXT_USER_LIST_foot, #23,#1     // draw the menu on the bottom line
   lda VICEMODE
   cmp #1
   bne ul_novice 
   jmp ul_vice 
 
 ul_novice
-  lda TEMPI
-  jsr send_start_byte_ff                      // RXBUFFER now contains the first group of users, 20
+  lda TEMPBYTE
+  jsr sendStartByte                      // RXBUFFER now contains the first group of users, 20
   displayBuffer RXBUFFER,#4 ,#2,#0
 
   lda #233
-  jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
+  jsr sendStartByte                      // RXBUFFER now contains the second group of users, 40
   displayBuffer RXBUFFER,#9 ,#2,#0
 
   lda #233
-  jsr send_start_byte_ff                      // RXBUFFER now contains the second group of users, 40
+  jsr sendStartByte                      // RXBUFFER now contains the second group of users, 40
   displayBuffer RXBUFFER,#14 ,#2,#0
 
-  displayText divider_line, #22,#0            // draw the divider line
-  displayText text_user_list_foot, #23,#1     // draw the menu on the bottom line
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
+  displayText TEXT_USER_LIST_foot, #23,#1     // draw the menu on the bottom line
   
 ul_vice
 ul_get_key_input  
@@ -712,7 +816,7 @@ ul_get_key_input
   jmp ul_get_key_input
 
 ul_next
-  mva #233 TEMPI
+  mva #233 TEMPBYTE
   jmp ul_start
   
 ul_prev
@@ -727,13 +831,13 @@ ul_exit_main_menu
 account_setup:
   mva #13 MENU_ID
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText text_account_setup, #1,#15      // draw the menu title
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText text_account_1, #5,#1
-  displayText divider_line, #11,#0            // draw the divider line
-  displayText text_option_exit, #15,#3
-  displayText divider_line, #22,#0            // draw the divider line
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText TEXT_ACCOUNT_SETUP, #1,#15      // draw the menu title
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText TEXT_ACCOUNT_1, #5,#1
+  displayText DIVIDER_LINE, #11,#0            // draw the divider line
+  displayText TEXT_OPTION_EXIT, #15,#3
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
   
   lda VICEMODE
   cmp #1
@@ -741,17 +845,17 @@ account_setup:
   jmp acc_vice
 acc_novice
   lda #243                                    // ask for the mac address, registration id, nickname and regstatus
-  jsr send_start_byte_ff                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
-  mva #1 splitIndex                           //
+  jsr sendStartByte                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
+  mva #1 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#14,#0       // Display the buffers on screen (Mac address)
-  mva #2 splitIndex                           //
+  mva #2 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#7 ,#18,#0       // Display the buffers on screen (registration id)
-  mva #3 splitIndex                           //
+  mva #3 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#9 ,#12,#0       // Display the buffers on screen (Nick Name)
-  mva #4 splitIndex                           //
+  mva #4 SLITINDEX                           //
   jsr splitRXbuffer                           //
   lda SPLITBUFFER
   cmp #120                                    // 120 = x  some unknown error
@@ -775,22 +879,22 @@ cp_110
 
 acc_vice                                      //
 acc_input_fields                              // 
-  mva #7 rowcrs                               // Put the cursor in the registration id field
-  mva #17 colcrs                              //
+  mva #7 ROWCRS                               // Put the cursor in the registration id field
+  mva #17 COLCRS                              //
   jsr show_cursor
   mva #19 FIELD_MIN                           //
   mva #35 FIELD_MAX                           //
   lda #32                                     //
-  jsr writeText                               //
+  jsr write_text                               //
   jsr text_input                              //
 
   mva #255 $2fc                               // Clear keyboard buffer
-  mva #9 rowcrs                               // Put the cursor in the Nick Name field
-  mva #11 colcrs                              //
+  mva #9 ROWCRS                               // Put the cursor in the Nick Name field
+  mva #11 COLCRS                              //
   mva #13 FIELD_MIN                           //
   mva #21 FIELD_MAX                           //
   lda #32                                     //
-  jsr writeText                               //
+  jsr write_text                               //
   jsr text_input                              //
   jsr hide_cursor
   
@@ -811,18 +915,18 @@ exit_to_main_menus
   jmp main_menu
 
 account_save_settings
-  displayText text_save_settings, #23, #3
+  displayText TEXT_SAVE_SETTINGS, #23, #3
   jsr wait_for_RTR
   lda #240
   sta $D502
-  mva #7 temp_i                               // Read regid and send it to cartridge
-  mva #18 temp_i+1
-  mva #38 input_fld_len
+  mva #7 TEMP_I                               // Read regid and send it to cartridge
+  mva #18 TEMP_I+1
+  mva #38 TEXTBOXLEN
   jsr read_field
 
-  mva #9 temp_i                               // Read nickname and send it to cartridge
-  mva #12 temp_i+1
-  mva #38 input_fld_len
+  mva #9 TEMP_I                               // Read nickname and send it to cartridge
+  mva #12 TEMP_I+1
+  mva #38 TEXTBOXLEN
   jsr read_field
 
 
@@ -842,13 +946,13 @@ server_setup:
  
   mva #12 MENU_ID
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText text_server_setup, #1,#15       // draw the menu title
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText text_server_1, #5,#1
-  displayText divider_line, #10,#0            // draw the divider line
-  displayText text_option_exit, #15,#3
-  displayText divider_line, #22,#0            // draw the divider line
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText TEXT_SERVER_SETUP, #1,#15       // draw the menu title
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText TEXT_SERVER_1, #5,#1
+  displayText DIVIDER_LINE, #10,#0            // draw the divider line
+  displayText TEXT_OPTION_EXIT, #15,#3
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
   displayBuffer SERVERNAME,#5,#14,#0
   lda VICEMODE
   cmp #1
@@ -863,17 +967,17 @@ server_setup:
   jsr jdelay
   
   lda #237                                    // get server connection status
-  jsr send_start_byte_ff
+  jsr sendStartByte
   displayBuffer  RXBUFFER,#23 ,#3,#0          // the RX buffer now contains the server status
   
 svr_vice 
 svr_input_fields                              //
-  mva #5 rowcrs                               // Put the cursor in the Server Name field
-  mva #13 colcrs                              //
+  mva #5 ROWCRS                               // Put the cursor in the Server Name field
+  mva #13 COLCRS                              //
   mva #15 FIELD_MIN                           //
   mva #38 FIELD_MAX                           //
   lda #32
-  jsr writeText
+  jsr write_text
   jsr show_cursor
   jsr text_input
   jsr hide_cursor
@@ -896,13 +1000,13 @@ srv_exit_to_main_menu
 
   
 server_save_settings
-  displayText text_save_settings, #23, #3
+  displayText TEXT_SAVE_SETTINGS, #23, #3
   jsr wait_for_RTR
   lda #246
   sta $D502
-  mva #5 temp_i                               // Read servername and send it to cartridge
-  mva #14 temp_i+1
-  mva #25 input_fld_len
+  mva #5 TEMP_I                               // Read servername and send it to cartridge
+  mva #14 TEMP_I+1
+  mva #25 TEXTBOXLEN
   jsr read_field
 
   mva #255 DELAY
@@ -922,63 +1026,63 @@ server_save_settings
 wifi_setup:  
   mva #12 MENU_ID
   jsr clear_keyboard_and_screen
-  displayText divider_line, #0,#0             // draw the divider line
-  displayText text_wifi_setup, #1,#15         // draw the menu title
-  displayText divider_line, #2,#0             // draw the divider line
-  displayText text_wifi_1, #5,#3
-  displayText divider_line, #11,#0            // draw the divider line
-  displayText text_option_exit, #15,#3
-  displayText divider_line, #22,#0            // draw the divider line
+  displayText DIVIDER_LINE, #0,#0             // draw the divider line
+  displayText TEXT_WIFI_SETUP, #1,#15         // draw the menu title
+  displayText DIVIDER_LINE, #2,#0             // draw the divider line
+  displayText TEXT_WIFI_1, #5,#3
+  displayText DIVIDER_LINE, #11,#0            // draw the divider line
+  displayText TEXT_OPTION_EXIT, #15,#3
+  displayText DIVIDER_LINE, #22,#0            // draw the divider line
   lda VICEMODE
   cmp #1
   beq wf_vice  
   
 wifi_get_cred
   lda #248                                    // ask Cartridge for the wifi credentials
-  jsr send_start_byte_ff
+  jsr sendStartByte
   displayBuffer  RXBUFFER,#23 ,#3,#1          // the RX buffer now contains the wifi status
   lda #251                                    // ask Cartridge for the wifi credentials
-  jsr send_start_byte_ff                      // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
-  mva #1 splitIndex                           //
+  jsr sendStartByte                           // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
+  mva #1 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#9,#0        // Display the buffers on screen (SSID name)
-  mva #2 splitIndex
+  mva #2 SLITINDEX
   jsr splitRXbuffer
   displayBuffer  SPLITBUFFER,#7 ,#13,#0       // Display the buffers on screen (SSID name)
-  mva #3 splitIndex
+  mva #3 SLITINDEX
   jsr splitRXbuffer
   displayBuffer  SPLITBUFFER,#9 ,#25,#0       // Display the buffers on screen (SSID name)
                                               //
 wf_vice                                       //
 wifi_input_fields                             //
-  mva #5 rowcrs                               // Put the cursor in the SSID field
-  mva #8 colcrs                               //
+  mva #5 ROWCRS                               // Put the cursor in the SSID field
+  mva #8 COLCRS                               //
   mva #10 FIELD_MIN                           //
   mva #35 FIELD_MAX                           //
   lda #32
-  jsr writeText
+  jsr write_text
   jsr show_cursor
   jsr text_input
   jsr hide_cursor  
   
   mva #255 $2fc                               // Clear keyboard buffer
-  mva #7 rowcrs                               // Put the cursor in the password field
-  mva #12 colcrs 
+  mva #7 ROWCRS                               // Put the cursor in the password field
+  mva #12 COLCRS 
   mva #14 FIELD_MIN
   mva #35 FIELD_MAX
   lda #32
-  jsr writeText
+  jsr write_text
   jsr show_cursor
   jsr text_input
   jsr hide_cursor
   
   mva #255 $2fc                               // clear keyboard buffer
-  mva #9 rowcrs                               // put the cursor in the time-offset field
-  mva #24 colcrs 
+  mva #9 ROWCRS                               // put the cursor in the time-offset field
+  mva #24 COLCRS 
   mva #26 FIELD_MIN
   mva #32 FIELD_MAX
   lda #32
-  jsr writeText
+  jsr write_text
   jsr show_cursor
   jsr text_input
   jsr hide_cursor
@@ -1000,21 +1104,21 @@ exit_to_main_menu
   jmp main_menu
 
 wifi_save_settings
-  displayText text_save_settings, #23, #3
+  displayText TEXT_SAVE_SETTINGS, #23, #3
   jsr wait_for_RTR
   lda #252
   sta $D502
-  mva #5 temp_i                               // Read SSID and send it to cartridge
-  mva #9 temp_i+1                             // temp_i (2 bytes) holds the row and column of the field
-  mva #27 input_fld_len                       // input_fld_len is the length of the field
+  mva #5 TEMP_I                               // Read SSID and send it to cartridge
+  mva #9 TEMP_I+1                             // TEMP_I (2 bytes) holds the row and column of the field
+  mva #27 TEXTBOXLEN                       // TEXTBOXLEN is the length of the field
   jsr read_field                              // jump to the read_field sub routine
-  mva #7 temp_i                               // Read password and send it to cartridge
-  mva #13 temp_i+1
-  mva #23 input_fld_len
+  mva #7 TEMP_I                               // Read password and send it to cartridge
+  mva #13 TEMP_I+1
+  mva #23 TEXTBOXLEN
   jsr read_field
-  mva #9 temp_i                               // Read password and send it to cartridge
-  mva #25 temp_i+1
-  mva #10 input_fld_len
+  mva #9 TEMP_I                               // Read password and send it to cartridge
+  mva #25 TEMP_I+1
+  mva #10 TEXTBOXLEN
   jsr read_field
 
   mva #255 DELAY
@@ -1026,19 +1130,19 @@ wifi_save_settings
 
 // ---------------------------------------------------------------------
 // read a field and send it to the cartridge
-// input row and column in temp_i and temp_i+1
+// input row and column in TEMP_I and TEMP_I+1
 // ---------------------------------------------------------------------
 read_field:
-  lda sm_prt          // reset the input field pointer
-  sta input_fld       // reset the input field pointer
-  lda sm_prt+1        // reset the input field pointer
-  sta input_fld+1     // reset the input field pointer
+  lda SCREENMEMORYPOINTER          // reset the input field pointer
+  sta TEXTBOX       // reset the input field pointer
+  lda SCREENMEMORYPOINTER+1        // reset the input field pointer
+  sta TEXTBOX+1     // reset the input field pointer
   jsr open_field      // get a pointer to the start adres of the field
   ldy #0
 loopr                 //
-  cpy input_fld_len   // compare y (our index) with the field length
+  cpy TEXTBOXLEN   // compare y (our index) with the field length
   beq loopr_exit      // if we reach the end of the field, exit
-  lda (input_fld),y   // read the field with index y
+  lda (TEXTBOX),y   // read the field with index y
   jsr wait_for_RTR    // wait for ready to receive on the cartridge
   sta $D502           // write the data to the cartridge
   iny                 // increase our index
@@ -1051,30 +1155,30 @@ loopr_exit            //
 
 // ---------------------------------------------------------------------
 // Open a field to read                  
-// input row and column in temp_i and temp_i+1               
-// this procedure creates a pointer to the field in input_fld (2 bytes)               ;
+// input row and column in TEMP_I and TEMP_I+1               
+// this procedure creates a pointer to the field in TEXTBOX (2 bytes)               ;
 // ---------------------------------------------------------------------
 open_field:   
-  ldx temp_i                   // get the row (temp_i holds the rown number)
-sm_lineadd                     // sm_prt is the start of screen memory
+  ldx TEMP_I                   // get the row (TEMP_I holds the rown number)
+sm_lineadd                     // SCREENMEMORYPOINTER is the start of screen memory
   clc                          // clear carry
-  lda input_fld                // start at the start of screen memory
+  lda TEXTBOX                // start at the start of screen memory
   adc #40                      // add 40 chars (one row) 
-  sta input_fld                // store input_fld (this is the low byte of the pointer)
+  sta TEXTBOX                // store TEXTBOX (this is the low byte of the pointer)
   bcc sm_ld_done               // if carry is set (overflow), we need to increase the high byte
-  inc input_fld+1              // increase the high byte if needed
+  inc TEXTBOX+1              // increase the high byte if needed
 sm_ld_done                     // one row added, done
   dex                          // decrease x
   bne sm_lineadd               // repeat the above if x is not zero
                                // now we are on the right row, next skip to the right column
-  ldx temp_i+1                 // get the column 
+  ldx TEMP_I+1                 // get the column 
 sm_rowadd                      //
   clc                          // 
-  lda input_fld                //
+  lda TEXTBOX                //
   adc #1                       // add one..
-  sta input_fld                // if we overflow, increase the high byte also
+  sta TEXTBOX                // if we overflow, increase the high byte also
   bcc sm_rd_done               //
-  inc input_fld+1              //
+  inc TEXTBOX+1              //
 sm_rd_done                     //
   dex                          // decrease x and repeat if needed
   bne sm_rowadd                //
@@ -1095,7 +1199,7 @@ are_we_in_the_matrix:                             //
   ldx #0                                          // x will be our index when we loop over the version text
 sendversion                                       // 
   jsr wait_for_RTR                                // wait for ready to receive (bit D7 goes high)
-  lda version,x                                   // load a byte from the version text with index x
+  lda VERSION,x                                   // load a byte from the version text with index x
   
   sta $D502                                       // send it to IO1
   cmp #128                                        // if the last byte was 128, the buffer is finished
@@ -1107,20 +1211,20 @@ check_matrix                                      //
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
   jsr jdelay                                      // and call the delay subroutine
-  jsr wait_for_RTS
-  lda $D502
-  sta color4
-  sta color2
+//  jsr wait_for_RTS
+//  lda $D502
+//  sta COLOR4
+//  sta COLOR2
 //  jsr jdelay
   jsr wait_for_RTS                                // 
   lda $D502                                       // read from cartridge
   cmp #128                                        // 
                                                   // 
-  beq exit_sim_check                              // if vice mode, we do not try to communicate with the
+  beq exitSimCheck                              // if vice mode, we do not try to communicate with the
   lda #1                                          // cartridge because it will result in error
   sta VICEMODE                                    //  
                                                   //
-exit_sim_check                                    // 
+exitSimCheck                                    // 
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
   jsr jdelay                                      // and call the delay subroutine
@@ -1129,7 +1233,7 @@ exit_sim_check                                    //
 // ---------------------------------------------------------------------
 // Send a command byte to the cartridge and wait for response;
 // ---------------------------------------------------------------------
-send_start_byte_ff:                     //
+sendStartByte:                     //
   jsr wait_for_RTR
   sta $D502                             // send the command byte
   ldx #0
@@ -1211,20 +1315,21 @@ check_priv_or_pub
 check_is_publ
   lda #254
 check_ff
-  jsr send_start_byte_ff  // RX buffer now contains a message or 128
+  jsr sendStartByte  // RX buffer now contains a message or 128
   lda RXBUFFER
   cmp #128
   beq getNumberOfPrivateMessages
   jmp display_message
   
 getNumberOfPrivateMessages  
+  jsr checkForUpdates    // first check for updates (new firmware) 
   lda SCREEN_ID
   cmp #3 
   beq check_exit
   lda #241
-  jsr send_start_byte_ff
-  mva colcrs savecc
-  mva rowcrs savecr
+  jsr sendStartByte
+  mva COLCRS savecc
+  mva ROWCRS savecr
   lda RXBUFFER
   cmp #$2d
   bne displayPMnumber
@@ -1233,8 +1338,8 @@ getNumberOfPrivateMessages
 displayPMnumber
   displayBuffer RXBUFFER, #20,#30,#0
 check_exit0
-  mva savecc colcrs 
-  mva savecr rowcrs 
+  mva savecc COLCRS 
+  mva savecr ROWCRS 
   jsr show_cursor
 check_exit  
   rts
@@ -1246,8 +1351,8 @@ savecc .byte 0
 display_message:
   // the RXBUFFER contains a message.
   
-  mva colcrs savecc
-  mva rowcrs savecr
+  mva COLCRS savecc
+  mva ROWCRS savecr
   ldx #0 
 make_room_loop
   lda RXBUFFER,x
@@ -1261,19 +1366,19 @@ make_room_loop
   
 get_display_start_address  
   // determine start address in screen memory
-  mwa startLine1 temp_i  
+  mwa STARTLINE1 TEMP_I  
   lda savex
   cmp #0
   beq do_display
-  mwa startLine2 temp_i  
+  mwa STARTLINE2 TEMP_I  
   lda savex
   cmp #1
   beq do_display
-  mwa startLine3 temp_i  
+  mwa STARTLINE3 TEMP_I  
   lda savex
   cmp #2
   beq do_display
-  mwa startLine4 temp_i  
+  mwa STARTLINE4 TEMP_I  
   
 do_display     
   // loop the RX buffer
@@ -1288,23 +1393,63 @@ rxb_loop
   bne write_char
   lda #128        // this is a real inverted space
 write_char
-  sta (temp_i),y
+  sta (TEMP_I),y
   iny
   inx
   jmp rxb_loop
   
 get_m_exit  
   jsr bell1  
-  mva savecc colcrs 
-  mva savecr rowcrs  
-  mva #80 $14
-   
+  mva savecc COLCRS 
+  mva savecr ROWCRS  
+  mva #80 $14 
   rts
+
+// ----------------------------------------------------------------------
+// Check for updates
+// ----------------------------------------------------------------------
+checkForUpdates
+  lda NEWROM         // if we allready know there is a new version, skip the check
+  cmp #128
+  bne exitVersions
+  lda #239
+  jsr sendStartByte
+  lda RXBUFFER        // if there is a new version, RXBUFFER contains the new version numbers 
+  cmp #128            // or it could contain nothing, just 128 if there is no new version
+  bne getVersions 
+  rts
+
+
+getVersions
+  ldy #0  
+getRom
+  lda RXBUFFER,y
+  sta NEWROM,y  
+  cmp #32
+  beq getVersionEsp
+  iny
+  jmp getRom
+getVersionEsp
+  lda #128
+  sta NEWROM,y  
+  ldx #0
+  iny
+getEsp  
+  lda RXBUFFER,y
+  sta NEWESP,x
+  cmp #128
+  beq exitVersions
+  iny
+  inx
+  jmp getEsp
+exitVersions:
+  rts
+
 // ----------------------------------------------------------------------
 // procedure for text input
 // ----------------------------------------------------------------------
 text_input:
-  mva #0 curinh                        // show the cursor 
+  mva #0 CURSORINH                        // show the cursor 
 key_loop
   jsr check_for_messages
   jsr getKey
@@ -1314,7 +1459,7 @@ key_loop
 cpClear
   cmp #1
   bne cpselect 
-  jsr clearInputLines
+  jsr clear_input_lines
   mva #255 $2fc                       // clear keyboard buffer
   jmp key_loop
   
@@ -1349,7 +1494,7 @@ cpstart
   cmp #1
   bne cpstart_exit
   mva #255 $2fc                       // clear keyboard buffer 
-  jsr clearinputlines
+  jsr clear_input_lines
   mva #0 doswitch
   jmp toggle_screens
 cpstart_exit  
@@ -1383,10 +1528,10 @@ cp_right
 
 check_end_pos
   pha
-  lda rowcrs
+  lda ROWCRS
   cmp #23
   bne rp
-  lda colcrs
+  lda COLCRS
   cmp #39
   bne rp      
   pla  
@@ -1402,18 +1547,18 @@ chrout                               // output the key to screen
   
 out_ok    
   pla  
-  jsr writeText
+  jsr write_text
 out_exit
   mva #255 $2fc                      // clear keyboard buffer 
   jmp key_loop
 in_field  
-  lda colcrs
+  lda COLCRS
   cmp FIELD_MAX
   bcc out_ok
   pla
-  jsr writeText
+  jsr write_text
   lda #$1E
-  jsr writeText
+  jsr write_text
   jmp out_exit  
 
 handle_delete
@@ -1422,10 +1567,10 @@ handle_delete
   cmp #10
   bcs del_in_field
 hd_ok  
-  lda rowcrs
+  lda ROWCRS
   cmp #21
   bne delok
-  lda colcrs
+  lda COLCRS
   cmp #0
   bne delok  
   mva #255 $2fc                       // clear keyboard buffer 
@@ -1433,32 +1578,32 @@ hd_ok
 delok  
   
   lda #$1E                    // this is to work around a bug. backspace does not always work  
-  jsr writeText               // when the cursor is at column zero.. this works around that
-  lda colcrs                  // in stead of using backspace, we walk the cursor back,
+  jsr write_text               // when the cursor is at column zero.. this works around that
+  lda COLCRS                  // in stead of using backspace, we walk the cursor back,
   cmp #39                     // write a space character and walk the cursor back again
   bne delcont                 // But if you walk the cursor back on column zero, it goes
   lda #$1C                    // to column 39 on that SAME LINE.. so we have to correct
-  jsr writeText               // that too..
+  jsr write_text               // that too..
 delcont                       // Man this is getting ugly..
   lda #32                     //
-  jsr writeText               // anyway, it works now. get over it, move on, have a beer
+  jsr write_text               // anyway, it works now. get over it, move on, have a beer
   lda #$1E
-  jsr writeText
-  lda colcrs
+  jsr write_text
+  lda COLCRS
   cmp #39
   bne delexit
   lda #$1C
-  jsr writeText
+  jsr write_text
 delexit
   mva #255 $2fc
   jmp key_loop
 
 del_in_field         
-  lda colcrs         
+  lda COLCRS         
   cmp FIELD_MIN
   bcc delexit
   lda #$7E
-  jsr writeText
+  jsr write_text
   jmp delexit
   
          
@@ -1466,7 +1611,7 @@ handle_return
   lda MENU_ID
   cmp #10
   bcs exit_on_return 
-  lda rowcrs                          // ignore this key if we are on the last line
+  lda ROWCRS                          // ignore this key if we are on the last line
   cmp #23
   beq handle_return_send 
   lda #$9b
@@ -1483,7 +1628,7 @@ handle_up
   lda MENU_ID
   cmp #10
   bcs up_exit
-  lda rowcrs                          // ignore this key if we are on the first line
+  lda ROWCRS                          // ignore this key if we are on the first line
   cmp #21
   bne upok
 up_exit
@@ -1497,7 +1642,7 @@ handle_down
   lda MENU_ID
   cmp #10
   bcs up_exit
-  lda rowcrs                          // ignore this key if we are on the last line
+  lda ROWCRS                          // ignore this key if we are on the last line
   cmp #23
   bne downok
   mva #255 $2fc                       // clear keyboard buffer 
@@ -1514,7 +1659,7 @@ hl_ok
   lda #$1E
   jmp chrout
 lf_limit
-  lda colcrs
+  lda COLCRS
   cmp FIELD_MIN
   bcs hl_ok
   jmp hr_ng
@@ -1527,7 +1672,7 @@ hr_ok
   lda #$1F
   jmp chrout
 rf_limit  
-  lda colcrs  
+  lda COLCRS  
   cmp FIELD_MAX
   bcc hr_ok
 hr_ng
@@ -1552,12 +1697,12 @@ blinkCursor:
   bne exit_bc
    
   mva #0 blink2  
-  lda rowcrs
+  lda ROWCRS
   sbc #21
   tax
   lda startR,x
   sta temppos
-  ldy colcrs
+  ldy COLCRS
    
 lq1  
   cpy #0  
@@ -1567,9 +1712,9 @@ lq1
   jmp lq1
 lqd
   ldy temppos
-  lda (inputfield),y                  ; get the character under the cursor
+  lda (MESSAGEFIELD),y                  ; get the character under the cursor
   adc #127                            ; invert the char
-  sta (inputfield),y                  ; put it back on the screen
+  sta (MESSAGEFIELD),y                  ; put it back on the screen
   cmp #127
   bcc setphase1  
   lda #0
@@ -1581,8 +1726,8 @@ setphase1
   inc cursorphase
   jmp exit_bc
   
-  //rowcrs = $54 ; cursor row 
-  //colcrs = $55 ; cursor colm ; find out where the cursor is
+  //ROWCRS = $54 ; cursor row 
+  //COLCRS = $55 ; cursor colm ; find out where the cursor is
   //
   
 exit_bc
@@ -1629,7 +1774,7 @@ updateSound:
   jsr playTone
   rts
   
-soundzipp:
+sound_zipp:
   ldx #5
   lda #20  
   jsr playTone
@@ -1665,7 +1810,7 @@ bell1:
   jsr playTone
   rts
   
-errorSound:
+error_sound:
   ldx #30
   lda #63
   jsr playTone
@@ -1761,27 +1906,27 @@ enddelay                                          //
 // ----------------------------------------------------------------------
 //  Clear input lines
 // ----------------------------------------------------------------------
-clearInputLines:  
+clear_input_lines:  
   // fill the input lines with spaces  
-  mva #21 rowcrs
-  mva #0  colcrs
+  mva #21 ROWCRS
+  mva #0  COLCRS
   lda #32 // space character
   ldy #0
   sty temppos
 cl_loop  
-  jsr writeText
+  jsr write_text
   inc temppos
   ldy temppos
-  cpy #118
+  cpy #119
   beq cl_exit
   jmp cl_loop
 cl_exit
   lda #0
-  sta curinh
-  mva #20 rowcrs
-  mva #0 colcrs
+  sta CURSORINH
+  mva #20 ROWCRS
+  mva #0 COLCRS
   lda #29 
-  jsr writetext
+  jsr write_text
   rts
 
  
@@ -1898,8 +2043,8 @@ sp_read:                                         // read a byte from the index b
 sp_n:                                            //    
     lda #128                                     //     
     sta SPLITBUFFER,y                            // load 128 (the end byte) into the splitbuffer   
-    dec splitIndex                               // decrease $02. This address holds a number that indicates   
-    lda splitIndex                               // which word we need from the RXBUFFER   
+    dec SLITINDEX                               // decrease $02. This address holds a number that indicates   
+    lda SLITINDEX                               // which word we need from the RXBUFFER   
     cmp #0                                       // so if $02 is equal to zero, we have the right word   
     beq sp_exit                                  // exit in that case   
     ldy #0                                       // if we need the next word   
@@ -1914,10 +2059,10 @@ sp_exit:                                         //
 // ----------------------------------------------------------------------            
 startScreen:
   jsr clear_keyboard_and_screen
-  displayText text_forAtari800xl, #14,#12
-  displayText text_madeBy, #16,#5
+  displayText TEXT_FOR_ATARI_800XL, #14,#12
+  displayText TEXT_MADE_BY, #16,#5
   mwa CHARSET temppos                  // make a backup of the pointer to the character set
-  mva #1 curinh
+  mva #1 CURSORINH
   ldx #0
 cp_char_loop                           // copy charactre set
   mva ROM_CHARS,x SCREEN_PUBL_BACKUP,x
@@ -1931,67 +2076,67 @@ cp_char_loop                           // copy charactre set
   // copy custom chars
   ldx #0
 cust_loop  
-  mva  custom_chars,x  SCREEN_PUBL_BACKUP,x
+  mva  CUSTOM_CHARS,x  SCREEN_PUBL_BACKUP,x
   inx
   cpx #128
   bne cust_loop
   mva #>SCREEN_PUBL_BACKUP CHARSET    // set the char pointer to the new location
-  lda sm_prt                          // create a pointer to the start of the screen
-  sta temp_i                          // and to the end of the screen
-  lda sm_prt+1
-  sta temp_i+1
-  inc temp_i+1
-  inc temp_i+1
-  inc temp_i+1  
+  lda SCREENMEMORYPOINTER                          // create a pointer to the start of the screen
+  sta TEMP_I                          // and to the end of the screen
+  lda SCREENMEMORYPOINTER+1
+  sta TEMP_I+1
+  inc TEMP_I+1
+  inc TEMP_I+1
+  inc TEMP_I+1  
   lda #16
-  sta temp_i
+  sta TEMP_I
   
   ldy #239                            // draw the main strips 
 ss2
   lda #8 //#85 
-  sta (temp_i),y
+  sta (TEMP_I),y
   lda #9 
-  sta (sm_prt),y
+  sta (SCREENMEMORYPOINTER),y
   dey
   cpy #255
   bne ss2
 
-  lda sm_prt               // make a new pointer that points to the 
-  sta temp_i               // start line of the big letters
-  sta temp_i
-  lda sm_prt+1
-  sta temp_i+1
-  inc temp_i+1
+  lda SCREENMEMORYPOINTER               // make a new pointer that points to the 
+  sta TEMP_I               // start line of the big letters
+  sta TEMP_I
+  lda SCREENMEMORYPOINTER+1
+  sta TEMP_I+1
+  inc TEMP_I+1
   lda #128
-  sta temp_i
+  sta TEMP_I
    
   ldy #0                    // draw the big letters
-ss_big_letters
-  lda sc_big_text,y
+ssBigLetters
+  lda SCBIGTEXT,y
   cmp #255
   beq stars 
-  sta (temp_i),y
+  sta (TEMP_I),y
   iny
-  jmp ss_big_letters
+  jmp ssBigLetters
   
 stars                         // draw the stars
   ldx #0
-  inc temp_i+1
-  inc temp_i+1
+  inc TEMP_I+1
+  inc TEMP_I+1
   lda #56
-  sta temp_i
-  sta textPointer             // we need this later for animating the stars
+  sta TEMP_I
+  sta TEXTPOINTER             // we need this later for animating the stars
   sta TEMPB 
-  mva temp_i+1 textPointer+1  // we need this later for animating the stars
+  mva TEMP_I+1 TEXTPOINTER+1  // we need this later for animating the stars
   
   lda #15
 stars_lp
-  ldy sc_stars1,x
+  ldy SC_STARS1,x
   cpy #255
   beq startupSound
-  sta (sm_prt),y
-  ldy sc_stars2,x  
-  sta (temp_i),y 
+  sta (SCREENMEMORYPOINTER),y
+  ldy SC_STARS2,x  
+  sta (TEMP_I),y 
   inx
   jmp stars_lp
 
@@ -2026,43 +2171,43 @@ animate_stars
   pha
   txa
   pha
-  mwa sm_prt temp_i
+  mwa SCREENMEMORYPOINTER TEMP_I
   jsr shift_line_to_left
-  lda temp_i
+  lda TEMP_I
   adc #39
-  sta temp_i
+  sta TEMP_I
   jsr shift_line_to_left
-  lda temp_i
+  lda TEMP_I
   adc #39
-  sta temp_i
+  sta TEMP_I
   jsr shift_line_to_left
-  lda temp_i
+  lda TEMP_I
   adc #39
-  sta temp_i
+  sta TEMP_I
   jsr shift_line_to_left
-  lda temp_i
+  lda TEMP_I
   adc #39
-  sta temp_i
+  sta TEMP_I
   jsr shift_line_to_left
   
   lda TEMPB
-  sta textPointer
+  sta TEXTPOINTER
   jsr shift_line_to_right  
-  lda textPointer
+  lda TEXTPOINTER
   adc #39
-  sta textPointer
+  sta TEXTPOINTER
   jsr shift_line_to_right
-  lda textPointer
+  lda TEXTPOINTER
   adc #39
-  sta textPointer
+  sta TEXTPOINTER
   jsr shift_line_to_right
-  lda textPointer
+  lda TEXTPOINTER
   adc #39
-  sta textPointer
+  sta TEXTPOINTER
   jsr shift_line_to_right
-  lda textPointer
+  lda TEXTPOINTER
   adc #39
-  sta textPointer
+  sta TEXTPOINTER
   jsr shift_line_to_right
   
   lda #40
@@ -2090,17 +2235,17 @@ playTone_startup:
 //  SUB ROUTINE TO SHIFT THE COLORS IN THE STAR LINES TO LEFT
 //=========================================================================================================
 shift_line_to_left:                               // a pointer to the screen memory address where the line we want to shift starts
-                                                  // is stored in zero page address temp_i, temp_i+1
+                                                  // is stored in zero page address TEMP_I, TEMP_I+1
     ldy #0                                        // before we start the loop we need to store the very first character
-    lda (temp_i),y                                // so load the character on the first position of the line
+    lda (TEMP_I),y                                // so load the character on the first position of the line
     pha                                           // push it to the stack, for later use
     iny                                           // y is our index for the loop, it starts at 1 this time.
                                                   // 
 shift_l_loop:                                     // start the loop
                                                   // the loop works like this:
-    lda (temp_i),y                                // 1) load the character at postion y in the accumulator
+    lda (TEMP_I),y                                // 1) load the character at postion y in the accumulator
     dey                                           // 2) decrease y
-    sta (temp_i),y                                // 3) store the char on position y. So now the character has shifted left
+    sta (TEMP_I),y                                // 3) store the char on position y. So now the character has shifted left
     cpy #39                                       // 4) see if we are at the end of the line
     beq shift_l_exit                              // and exit if we are
     iny                                           // 5) if not, increase y
@@ -2110,7 +2255,7 @@ shift_l_loop:                                     // start the loop
 shift_l_exit                                      // here we exit the loop
                                                   // 
     pla                                           // 7) we need to store the very first character (the most left)
-    sta (temp_i),y                                // on the most right position, so the line goes round and round
+    sta (TEMP_I),y                                // on the most right position, so the line goes round and round
     rts                                           // now this line have shifted 1 position to the left
                                                   // 
 //=========================================================================================================
@@ -2119,52 +2264,52 @@ shift_l_exit                                      // here we exit the loop
 TempCharR .byte 0                                 //
 TEMPB .byte 0                                     //
 shift_line_to_right:                              // a pointer to the memory address where the line we want to shift starts
-                                                  // is stored in zero page address textPointer (2 bytes)
+                                                  // is stored in zero page address TEXTPOINTER (2 bytes)
                                                   // shifting a line to the right is a bit more complicated as to shifting to the left.
                                                   // to better explain we have this line as example ABCDEFGH
                                                   // 
     ldy #0                                        // start at postion zero (A in our line)
-    lda (textPointer),y                           // read the characters color (the zero page address $f7,$f8
-    sta temp_o                                    // store it temporary in memory address 'textPointer', so now A is stored in 'textPointer'
+    lda (TEXTPOINTER),y                           // read the characters color (the zero page address $f7,$f8
+    sta TEMP_O                                    // store it temporary in memory address 'TEXTPOINTER', so now A is stored in 'TEXTPOINTER'
                                                   // 
 shift_r_loop:                                     // 
     iny                                           // increase our index, y
-    lda (textPointer),y                           // read the character at the next postion (B in our line of data)
+    lda (TEXTPOINTER),y                           // read the character at the next postion (B in our line of data)
     sta TempCharR                                 // store color B temporary in memory address 'TempCharR', so now B is stored in 'TempCharR'
-    lda temp_o                                    // now load 'textPointer' (that contains A) back into the accumulator
-    sta (textPointer),y                           // and store it where B was. The Data line looks like this now AACDEFGH (A has shifted to the right and B is in temporary storage at $ff)
+    lda TEMP_O                                    // now load 'TEXTPOINTER' (that contains A) back into the accumulator
+    sta (TEXTPOINTER),y                           // and store it where B was. The Data line looks like this now AACDEFGH (A has shifted to the right and B is in temporary storage at $ff)
     iny                                           // increase y again
-    lda (textPointer),y                           // Read the color on the next position (C in our line of data)
-    sta temp_o                                    // Store it it temporary in memory address textPointer, so now B is stored in textPointer
+    lda (TEXTPOINTER),y                           // Read the color on the next position (C in our line of data)
+    sta TEMP_O                                    // Store it it temporary in memory address TEXTPOINTER, so now B is stored in TEXTPOINTER
     lda TempCharR                                 // now load TempCharR (that contains B) back into the accumulator
-    sta (textPointer),y                           // and put that where C was. The data line now look like this: AABDEFGH (A and B have shifted and C is in temporary storage at $fe)
+    sta (TEXTPOINTER),y                           // and put that where C was. The data line now look like this: AABDEFGH (A and B have shifted and C is in temporary storage at $fe)
     cpy #38                                       // see if we are at the end of the line 
     bne shift_r_loop                              // if not, jump back to the start of the loop
                                                   // after the loop we have processed 39 positions, but the line is 40 long
-                                                  // At this point G is in memory storage textPointer and H is in storage at TempCharR
+                                                  // At this point G is in memory storage TEXTPOINTER and H is in storage at TempCharR
     iny                                           // increase y
-    lda temp_o                                    // load G
-    sta (textPointer),y                           // put it in position H
+    lda TEMP_O                                    // load G
+    sta (TEXTPOINTER),y                           // put it in position H
                                                   // 
-                                                  // NOW the data looks like this: AABCDEFG (all characters have shifted except for H which is in storeage at textPointer)
+                                                  // NOW the data looks like this: AABCDEFG (all characters have shifted except for H which is in storeage at TEXTPOINTER)
     ldy #0                                        // set the index back to zero
     lda TempCharR                                 // load TempCharR (H) into the accumulator
-    sta (textPointer),y                           // and store it at the first position.
+    sta (TEXTPOINTER),y                           // and store it at the first position.
     rts                                           // Now our line looks like this: HABCDEFG all characters have shifted to the right one position.
                                                   // 
 // ----------------------------------------------------------------------
 // displayBuffer, used in macro displayRXBuffer
 // ----------------------------------------------------------------------
 displayBufferk:                                   // 
-  mva #1 curinh                                   // 
+  mva #1 CURSORINH                                   // 
 db_next_char                                      // 
-  ldy character                                   // 
-  lda (textPointer),y                             //   
+  ldy CHARINDEX                                   // 
+  lda (TEXTPOINTER),y                             //   
   cmp #128                                        // 
   beq db_exit                                     // 
 write_it                                          // 
-  jsr writeText                                   // 
-  inc character                                   // 
+  jsr write_text                                   // 
+  inc CHARINDEX                                   // 
   jmp db_next_char                                // 
 db_exit                                           // 
   rts                                             // 
@@ -2173,20 +2318,20 @@ db_exit                                           //
 // displayTextk, used in macro displayText
 // ----------------------------------------------------------------------
 displayTextk:  
-  mva #1 curinh
+  mva #1 CURSORINH
 next_char
-  ldy character
-  cpy textLen
+  ldy CHARINDEX
+  cpy TEXTLEN
   beq exit_dpt
-  lda (textPointer),y
+  lda (TEXTPOINTER),y
 
-  jsr writeText
-  inc character
+  jsr write_text
+  inc CHARINDEX
   jmp next_char
 exit_dpt
   rts
   
-writeText:
+write_text:
   tax
   lda putchar_ptr+1
   pha
@@ -2221,16 +2366,16 @@ resetAtari:
 // Hide or show the cursor
 //----------------------------------------------------------------------
 hide_cursor:                //
-  mva #1 curinh             // hide the cursor
+  mva #1 CURSORINH             // hide the cursor
   jmp move_cursor           //
                             //
 show_cursor:                //
-  mva #0 curinh             // show the cursor
+  mva #0 CURSORINH             // show the cursor
 move_cursor                 // move the cursor so it will actually become (in)visible
   lda #28                   // up one line
-  jsr writeText             //
+  jsr write_text             //
   lda #29                   // down one line
-  jsr writeText             //
+  jsr write_text             //
   rts                       //
                             //
 //----------------------------------------------------------------------
@@ -2242,18 +2387,21 @@ send_message:
   bne sm_waitrtr
   rts
 sm_waitrtr
+  lda VICEMODE
+  cmp #1
+  beq sendWasGood
   jsr wait_for_RTR
   lda #253
   sta $D502
   
   jsr beep1
   jsr hide_cursor
-  mwa inputfield temp_i
-  dec temp_i  
+  mwa MESSAGEFIELD TEMP_I
+  dec TEMP_I  
   ldy #0
 sendLines
   jsr wait_for_RTR
-  lda (temp_i),y  
+  lda (TEMP_I),y  
   sta MESSAGE_LINES_BACKUP,y
   sta $D502
   iny
@@ -2265,16 +2413,16 @@ sendLines
   sta $D502
     
   lda #249 
-  jsr send_start_byte_ff   // get the result of the send action
+  jsr sendStartByte   // get the result of the send action
   lda RXBUFFER
   cmp #0
   beq sendWasGood 
   jsr show_cursor
   rts
 sendWasGood  
-  mva #0 curinh               // enable the cursor again
-  jsr clearInputLines
-  jsr printPmUser  // print pmuser if we are on screen #3
+  mva #0 CURSORINH               // enable the cursor again
+  jsr clear_input_lines
+  jsr print_pm_user  // print pmuser if we are on screen #3
   rts
   
 // ----------------------------------------------------------------------
@@ -2287,13 +2435,13 @@ check_private:
   jmp on_priv_screen          
 on_publ_screen                               
   ldy #0                    // we are on the public screen, the message should
-  mwa inputfield temp_i     // not start with @ 
+  mwa MESSAGEFIELD TEMP_I     // not start with @ 
   lda VICEMODE
   cmp #1
   beq t11
-  dec temp_i
+  dec TEMP_I
 t11
-  lda (temp_i),y           
+  lda (TEMP_I),y           
   cmp #32                   // 32 is the screen code for @
   beq ch_go 
   jmp check_p_exit
@@ -2301,15 +2449,15 @@ ch_go
   lda #1 
   sta inhsend
   sta doswitch
-  jsr errorSound
-  mva rowcrs p_cursor_y
-  mva colcrs p_cursor_x
+  jsr error_sound
+  mva ROWCRS p_cursor_y
+  mva COLCRS p_cursor_x
   jsr backup_screen
   jsr clear_keyboard_and_screen
-  displayText pubPrivError, #8, #0
+  displayText ERROR_PUB_PRIV, #8, #0
   jsr bigdelay  
-  mva #<SCREEN_PUBL_BACKUP temp_i
-  mva #>SCREEN_PUBL_BACKUP temp_i+1
+  mva #<SCREEN_PUBL_BACKUP TEMP_I
+  mva #>SCREEN_PUBL_BACKUP TEMP_I+1
   jsr restore_the_screen 
   lda #1 
   sta restoreMessageLines
@@ -2318,13 +2466,13 @@ ch_go
 
 on_priv_screen
   ldy #0                    // we are on the private screen, the message should
-  mwa inputfield temp_i     // start with @
+  mwa MESSAGEFIELD TEMP_I     // start with @
   lda VICEMODE
   cmp #1
   beq t12
-  dec temp_i
+  dec TEMP_I
 t12
-  lda (temp_i),y            
+  lda (TEMP_I),y            
   cmp #32           // yes, it starts with @ as it should
  
   bne doNotSend 
@@ -2332,18 +2480,18 @@ t12
   jmp check_p_exit
 doNotSend
   mva #1 inhsend
-  jsr errorSound
-  mva rowcrs p_cursor_y
-  mva colcrs p_cursor_x
+  jsr error_sound
+  mva ROWCRS p_cursor_y
+  mva COLCRS p_cursor_x
   jsr backup_screen
   jsr clear_keyboard_and_screen
-  displayText privError, #8, #0
+  displayText ERROR_PRIV, #8, #0
   jsr bigdelay
-  mva #<SCREEN_PRIV_BACKUP temp_i
-  mva #>SCREEN_PRIV_BACKUP temp_i+1
+  mva #<SCREEN_PRIV_BACKUP TEMP_I
+  mva #>SCREEN_PRIV_BACKUP TEMP_I+1
   jsr restore_the_screen
-  mva p_cursor_y rowcrs
-  mva p_cursor_x colcrs
+  mva p_cursor_y ROWCRS
+  mva p_cursor_x COLCRS
   jsr show_cursor
 check_p_exit
   rts
@@ -2361,7 +2509,7 @@ bigdelay
   rts
 
 getPmUser: // read the pm user from screen
-  lda (temp_i),y
+  lda (TEMP_I),y
   sta PMUSER,y
   cmp #0  // space
   beq fin_pmuser
@@ -2385,27 +2533,27 @@ rts
 // Calculate the addresses of where the messages will start
 // ----------------------------------------------------------------------
 calculate_screen_addresses:  
-  mwa sm_prt temp_i   // calculate some adresses from the start of screen memory (sm_prt)
-  lda temp_i
+  mwa SCREENMEMORYPOINTER TEMP_I   // calculate some adresses from the start of screen memory (SCREENMEMORYPOINTER)
+  lda TEMP_I
   clc
   adc #$80
-  sta startLine4  // C0
+  sta STARTLINE4  // C0
   adc #$28
-  sta startLine3  // E8
+  sta STARTLINE3  // E8
   adc #$28
   clc
-  sta startLine2  // 10
+  sta STARTLINE2  // 10
   adc #$28
-  sta startLine1  // 38
+  sta STARTLINE1  // 38
   
-  lda temp_i+1
+  lda TEMP_I+1
   adc #2
-  sta startLine4+1
-  sta startLine3+1
-  lda temp_i+1
+  sta STARTLINE4+1
+  sta STARTLINE3+1
+  lda TEMP_I+1
   adc #3
-  sta startLine2+1
-  sta startLine1+1
+  sta STARTLINE2+1
+  sta STARTLINE1+1
 //  sta $BF38  // start adres bij 1 regel (system message ofzo)
 //  sta $BF10  // start adres bij 2 regels
 //  sta $BEE8  // start adres bij 3 regels
@@ -2415,15 +2563,22 @@ calculate_screen_addresses:
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-version .byte '3.77',128
-version_date .byte '10/2024',128
+VERSION .byte '3.78',128
+VERSION_DATE .byte '12/2024',128
+.local VERSION_LINE
+.byte ' Version  ROM x.xx  ESP x.xx    12/2024'
+.endl
+NEWROM: .byte 128,128,128,128,128,128
+NEWESP: .byte 128,128,128,128,128,128
+
+
 NOPMS .byte 18,18,18,18,18,18,18,18,128
 HAVE_M_BACKUP:                .byte 0             // 
 HAVE_P_BACKUP:                .byte 0             //
 HAVE_ML_BACKUP:               .byte 0             //
 
 // data for big letters on the start screen
-sc_big_text:                                 
+SCBIGTEXT:                                 
 	.byte 0,0,0,0,0,0,0,0
 	.byte 3,5,5,2,10,0,0,10
 	.byte 3,5,5,2,11,12,11,0
@@ -2451,7 +2606,7 @@ sc_big_text:
 	.byte 0,0,0,0,0,0,0,0
 	.byte 255 
 	   
-custom_chars:                          // custom chars for big letters and stars            
+CUSTOM_CHARS:                          // custom chars for big letters and stars            
   .byte 0,0,0,0,0,0,0,0                // #0  space
   .byte 24,24,56,240,224,0,0,0         // #1  arc 1 
   .byte 0,0,0,224,240,56,24,24         // #2  arc 2
@@ -2469,28 +2624,46 @@ custom_chars:                          // custom chars for big letters and stars
   .byte 24,24,24,248,248,24,24,24      // #14 T to left
   .byte 170,127,222,117,234,119,234,85 // #15 stardust
   
-sc_stars1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
-sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255  
+SC_STARS1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
+SC_STARS2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255  
 
-  .local text_user_list
+CONFIRMUPDATE: .byte "UPDATE!",128
+
+UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
+           .byte $12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,5,$9b
+           .byte $20,$20,$7c
+           :32 .byte $20
+           .byte $7c,$9b,$20,$20,$1A
+           :32 .byte $12
+           .byte 3,$9b,$1f,$1f,$1f,$1c,$1c           
+           .byte 128
+  .local UPDATEDONE
+  .byte 'Update complete!'
+  .endl
+  
+  .local TEXT_INSTALLING
+  .byte 'Installing firmware'
+  .lend
+  
+  .local TEXT_USER_LIST
   .byte 'USER LIST, inverted users are online'
   .endl
-  .local text_user_list_foot
+  .local TEXT_USER_LIST_foot
   .byte '[p] previous  [n] next  [ESC] Exit'
   .endl
   
-  .local text_F5_toggle
+  .local TEXT_F5_TOGGLE
   .byte 'Private Messaging      [SEL] Main Chat'
   .endl
   
-  .local text_no_cartridge
+  .local TEXT_NO_CARTRIDGE
   .byte 'Cartridge Not Installed!'
   .endl
-  .local text_wifi_setup
+  .local TEXT_WIFI_SETUP
   .byte 'WIFI SETUP'
   .endl
   
-  .local text_wifi_1
+  .local TEXT_WIFI_1
   .byte 'SSID:'
   .byte  $9b,$9b,'   '
   .byte 'PASSWORD:'
@@ -2498,7 +2671,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte 'Time Offset from GMT: +0'
   .endl
 
-  .local text_option_exit  
+  .local TEXT_OPTION_EXIT 
   .byte '[ESC] Exit'
   .endl  
 
@@ -2510,21 +2683,21 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte 'MAIN MENU'
   .endl
   
-  .local text_server_setup
+  .local TEXT_SERVER_SETUP
   .byte 'SERVER SETUP'
   .endl
   
-  .local text_server_1
+  .local TEXT_SERVER_1
   .byte 'Server name:'
   .byte  $9b,$9b,' '
   .byte 'Example: www.chat64.nl'  
   .endl
 
-  .local text_account_setup
+  .local TEXT_ACCOUNT_SETUP
   .byte 'ACCOUNT SETUP'
   .endl
   
-  .local text_account_1
+  .local TEXT_ACCOUNT_1
   .byte 'MAC Address:'
   .byte  $9b,$9b,' '
   .byte 'Registration ID:'
@@ -2532,11 +2705,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte 'Nick Name:'
   .endl
   
-  .local version_line
-  .byte ' Version  ROM x.xx  ESP x.xx    10/2024'
-  .endl
-  
-  .local text_save_settings
+  .local TEXT_SAVE_SETTINGS
   .byte 'Saving Settings, please wait..     '
   .endl
   
@@ -2565,7 +2734,7 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .byte '[< >] Change Color'
   .endl
   
-  .local text_help_screen
+  .local TEXT_HELP_SCREEN
   .byte 'HELP',$9b,$9b
   .byte 'Use Ctrl-Return to send your message immediately',$9b
   .byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'
@@ -2573,60 +2742,44 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
 
   .endl
   
-  .local text_help_screen2
+  .local TEXT_HELP_SCREEN2
   .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with'
   .endl
   
-  .local text_about_screen
+  .local TEXT_ABOUT_SCREEN
   .byte 'ABOUT CHAT64',$9b,$9b
   .byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B
   .byte 'A new version of CHAT64 is now availableto everyone.',$9B
   .byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B
   .endl  
-  .local text_about_screen2
+  .local TEXT_ABOUT_SCREEN2
   .byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B
   .byte 'Hardware, software and manuals are available on Github',$9B,$9B
   .byte 'github.com/bvenneker/Chat64-Atari800'
   .endl  
   
-  .local text_madeBy 
+  .local TEXT_MADE_BY 
   .byte 'Made by Bart and Theo in 2024'  
   .endl
   
-   .local text_forAtari800xl
+   .local TEXT_FOR_ATARI_800XL
    .byte 'For Atari 800XL'
    .endl
    
-  .local divider_line
+  .local DIVIDER_LINE
   :40 .byte 18 ; 40 x byte 18
   .endl
   
-  .local text_startScreen
-  .byte "       BART       "
-  .byte "      atari 800xl  "
-  .byte "         Input Output Test Program         "
-  .endl
-  
-  .local pubPrivError //1234567890123456789012345678901234567890
+  .local ERROR_PUB_PRIV //1234567890123456789012345678901234567890
   .byte  '    Don''t send private messages from ',31,31,31,29
   .byte  '           the public screen'
   .endl
   
-  .local privError //1234567890123456789012345678901234567890
+  .local ERROR_PRIV //1234567890123456789012345678901234567890
   .byte             ' Private messages should start with:',155
   .byte             '         @[username]'
   .endl
   
-  .local dl ; display list for the start screen
-     .byte $70,$70,$70,$70,$70,$70,$70   
-     .byte $f0          ; 8 blank lines + DLI on next scan line
-     .byte $47,a(text_startScreen) ; Mode 6 + LMS, setting screen memory to text
-     .byte $70,$70      ; 16 blank lines
-     .byte 6            ; Mode 6
-     .byte $70,$70      ; 16 blank lines
-     .byte 2            ; 3 lines of Mode 7
-     .byte $41,a(dl)   
-  .endl
   
   .local startR 
      .byte 0,40,80
@@ -2647,10 +2800,27 @@ sc_stars2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,1
   .local text_reg_x
   .byte 'Error: Server unreachable'
   .endl
+  
+  .local TEXT_UPDATE_TITLE
+  .byte 'UPDATE AVAILABLE'
+  .endl
+  
+  .local TEXT_NEW_VERSIONS
+  .byte 'There is a new version available',155
+  .byte 'Do you want to upgrade? (Y/N)'
+
+  .endl
+  .local TEXT_NEW_ROM
+  .byte 'New ROM: '
+  .endl
+
+  .local TEXT_NEW_ESP
+  .byte 'New ESP: '
+  .endl
+
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------
-PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128
 inhsend  .byte 0
 doswitch .byte 0
 restoreMessageLines .byte 0
@@ -2661,8 +2831,6 @@ DELAY    .byte 0,0
 z_as     .byte 0,0
 cursorphase  .byte 0,0
 temppos  .byte 0,0   
-RXBUFFER :250 .byte 128        
-SPLITBUFFER :40 .byte 128   
 MENU_ID .byte 0
 SCREEN_ID .byte 0
 FIELD_MAX .byte 0
@@ -2671,17 +2839,19 @@ VICEMODE .byte 0
 CONFIG_STATUS .byte 0,128
 SWVERSION .byte '9.99',128
 SERVERNAME .byte 'www.chat64.nl          ',128
-TEMPI .byte 0
+TEMPBYTE .byte 0
 WIFISTATUS .byte 0
 p_cursor_x .byte 0
 p_cursor_y .byte 0
-m_cursor_x .byte 0
-m_cursor_y .byte 0
-startLine4 .byte 0,0   // start address when message is 4 lines
-startLine3 .byte 0,0   // start address when message is 3 lines
-startLine2 .byte 0,0   // start address when message is 2 lines
-startLine1 .byte 0,0   // start address when message is 1 lines
-
+MCURSORX .byte 0
+MCURSORY .byte 0
+STARTLINE4 .byte 0,0   // start address when message is 4 lines
+STARTLINE3 .byte 0,0   // start address when message is 3 lines
+STARTLINE2 .byte 0,0   // start address when message is 2 lines
+STARTLINE1 .byte 0,0   // start address when message is 1 lines
+PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128
+RXBUFFER :150 .byte 128        
+SPLITBUFFER :40 .byte 128 
 
   
 // -----------------------------------
@@ -2690,13 +2860,13 @@ startLine1 .byte 0,0   // start address when message is 1 lines
 // column = 0,39
 // -----------------------------------
 .macro displayBuffer buffer,line,column,offset
-  mva :line rowcrs 
-  mva :column colcrs  
-  mva :offset character
+  mva :line ROWCRS 
+  mva :column COLCRS  
+  mva :offset CHARINDEX
   lda #<(:buffer) 
-  sta textPointer
+  sta TEXTPOINTER
   lda #>(:buffer)
-  sta textPointer+1
+  sta TEXTPOINTER+1
   jsr displayBufferk  
 .endm  
 
@@ -2707,15 +2877,15 @@ startLine1 .byte 0,0   // start address when message is 1 lines
 // column = 0,39
 // -----------------------------------
 .macro displayText text,line,column
-  mva :line rowcrs
-  mva :column colcrs
-  mva #0 character
+  mva :line ROWCRS
+  mva :column COLCRS
+  mva #0 CHARINDEX
   lda #.len :text
-  sta textLen
+  sta TEXTLEN
   lda #<(:text) 
-  sta textPointer
+  sta TEXTPOINTER
   lda #>(:text)
-  sta textPointer+1
+  sta TEXTPOINTER+1
   jsr displayTextk  
 .endm  
 
