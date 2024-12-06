@@ -26,7 +26,8 @@ volatile unsigned long tempMessageIds[] = { 0, 0 };
 volatile unsigned long lastprivmsg = 0;
 String msgtype = "public";  // do not change this!
 String users = "";          // a list of all users on this server.
-volatile bool updateUserlist = false;
+volatile bool updateUserlist = false; // user list to check existing users
+volatile bool refreshUserPages = true; // user list for 'who is online'
 char msgbuffer[500];  // a character buffer for a chat message
 volatile int msgbuffersize = 0;
 volatile int haveMessage = 0;
@@ -128,8 +129,7 @@ void get_full_userlist() {
   // The second core calls this webpage so the main thread does not suffer performance
   Serial.println("GET FULL USER LIST");
   for (int p = 0; p < 8; p++) {
-    userPages[p] = getUserList(p);
-    // char firstchar = userPages[p].charAt(0);    
+    userPages[p] = getUserList(p);    
   }
 }
 
@@ -142,9 +142,13 @@ String getUserList(int page) {
   http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   
   String httpRequestData = "regid=" + regID + "&pagesize=15&page=" + page + "&version=2";
-  unsigned long responseTime = millis();
-  http.POST(httpRequestData);
-  responseTime = millis() - responseTime;
+  int httpResponseCode = http.POST(httpRequestData);
+
+  // debug voor lege userlist
+  Serial.print("==>> response van XLlistUsers.php = ");
+  Serial.println(httpResponseCode);
+  // einde debug voor lege userlist
+  
   String result = "0";
   result = http.getString();
   result.trim();
@@ -244,7 +248,7 @@ void WifiCoreLoop(void* parameter) {
   WiFiResponseMessage responseMessage;
   unsigned long last_up_refresh = millis() + 5000;
   unsigned long heartbeat = millis();
-  bool refreshUserPages = true;
+  
 
   for (;;) {  // this is an endless loop
 
@@ -313,7 +317,7 @@ void WifiCoreLoop(void* parameter) {
     myLocalIp=WiFi.localIP().toString();
 
     if (!getMessage) {                     // this is a wait loop
-      if (millis() > last_up_refresh + 10000 and pastMatrix and !sendingMessage) {
+      if (millis() > last_up_refresh + 30000 and pastMatrix and !sendingMessage) {
         refreshUserPages = true;
       }
       if (updateUserlist and !getMessage and pastMatrix and !sendingMessage) {

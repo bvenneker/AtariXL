@@ -481,6 +481,7 @@ void loop() {
           if (!sc) {
             urgentMessage = ">>ERROR: sending the message<<";
             send_error = 1;
+            sendingMessage = 0;
           } else {
             // No error, read the message back from the database to show it on screen
             sendingMessage = 0;
@@ -846,10 +847,8 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 236 = Computer asks for the server configuration status and servername
           // ------------------------------------------------------------------------------
-
-
 #ifdef debug
-          //Serial.println("response 236 = " + configured + " " + server + " " + SwVersion);
+          Serial.println("response 236 = " + configured + " " + server + " " + SwVersion);
 #endif
           send_String_to_Bus(configured + char(129) + server + char(129) + SwVersion + char(129));
           break;
@@ -860,7 +859,6 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 235 = Computer sends configuration status
           // ------------------------------------------------------------------------------
-
           receive_buffer_from_Bus(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -873,30 +871,34 @@ void loop() {
         }
       case 234:
         {
-          // Computer asks for user list, first page.
-          // we send a max of 12 users in one long string
+          // Computer asks for user list, first group.
           userpageCount = 0;
           String ul1 = userPages[userpageCount];
           if (ul1.length()<2){
-
-          }
+			  refreshUserPages=true;
+              Serial.println("THE USERLIST IS EMPTY");
+              ul1=".EMPTY";
+              send_String_to_Bus(ul1);
+          } else {
           Serial.println(ul1);
           send_String_to_Bus(ul1);
           userpageCount++;
+          }
           break;
         }
       case 233:
         {
-          // Computer asks for user list, second or third page.
-          // we send a max of 14 users in one long string
-          Serial.print("PAGE COUNT =");
+          // Computer asks for user list, second or third group.
+          // we send a max of 15 users in one long string
+          Serial.print("GROUP COUNT =");
           Serial.println(userpageCount);
           String ul1 = userPages[userpageCount];
           if (ul1.length() >2){
             Serial.println(ul1);
             send_String_to_Bus(ul1);
+            userpageCount++;
           } else send_String_to_Bus(" ");
-          userpageCount++;
+          
           if (userpageCount > 7) userpageCount = 7;
           break;
         }
@@ -904,7 +906,6 @@ void loop() {
         {
           Serial.println("RESET button on Atari pressed");
           ESP.restart();
-          //reboot();
           break;
         }
       case 231:
@@ -938,7 +939,6 @@ void loop() {
           settings.begin("mysettings", false);
           settings.putUInt("scrcolor", screenColor);
           settings.end();
-          
           break;
         }
       case 228:

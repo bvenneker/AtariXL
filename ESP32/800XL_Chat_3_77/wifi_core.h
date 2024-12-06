@@ -24,6 +24,7 @@ extern volatile unsigned long lastprivmsg;
 extern String msgtype;
 extern String users;
 extern volatile bool updateUserlist;
+extern volatile bool refreshUserPages;
 extern char msgbuffer[500];
 extern volatile int msgbuffersize;
 extern volatile int haveMessage;
