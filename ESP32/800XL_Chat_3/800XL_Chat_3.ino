@@ -120,6 +120,37 @@ void create_Task_WifiCore() {
 //  SETUP
 // *************************************************
 void setup() {
+    // define inputs
+  pinMode(sdata, INPUT);
+  pinMode(BusIO1, INPUT_PULLUP);
+  pinMode(BusIO2, INPUT_PULLUP);
+  pinMode(resetSwitch, INPUT_PULLUP);
+
+  // define interrupts
+  attachInterrupt(BusIO1, isr_io1, FALLING);         // interrupt for io1, Atari writes data at $D502
+  attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Atari reads data at $D502
+  attachInterrupt(resetSwitch, isr_reset, FALLING);  // interrupt for reset button
+
+
+  // define outputs
+  pinMode(RTR, OUTPUT);
+  digitalWrite(RTR, LOW);
+  pinMode(RTS, OUTPUT);
+  digitalWrite(RTS, LOW);
+
+  pinMode(oSdata, OUTPUT);
+  pinMode(CLED, OUTPUT);
+  digitalWrite(CLED, LOW);
+  ready_to_receive(false);
+  ready_to_send(false);
+  pinMode(RCLK, OUTPUT);
+  digitalWrite(RCLK, LOW);  // must be low
+  pinMode(sclk1, OUTPUT);
+  digitalWrite(sclk1, LOW);  // data shifts to serial data output on the transition from low to high.
+  pinMode(sclk2, OUTPUT);
+  digitalWrite(sclk2, LOW);  // data shifts to serial data output on the transition from low to high.
+
+
   Serial.begin(115200);
 
   commandBuffer = xMessageBufferCreate(sizeof(commandMessage) + sizeof(size_t));
@@ -177,36 +208,6 @@ void setup() {
   screenColor = settings.getUInt("scrcolor", 0);
   
   settings.end();
-
-  // define inputs
-  pinMode(sdata, INPUT);
-  pinMode(BusIO1, INPUT_PULLUP);
-  pinMode(BusIO2, INPUT_PULLUP);
-  pinMode(resetSwitch, INPUT_PULLUP);
-
-  // define interrupts
-  attachInterrupt(BusIO1, isr_io1, FALLING);         // interrupt for io1, Atari writes data at $D502
-  attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Atari reads data at $D502
-  attachInterrupt(resetSwitch, isr_reset, FALLING);  // interrupt for reset button
-
-
-  // define outputs
-  pinMode(RTR, OUTPUT);
-  digitalWrite(RTR, LOW);
-  pinMode(RTS, OUTPUT);
-  digitalWrite(RTS, LOW);
-
-  pinMode(oSdata, OUTPUT);
-  pinMode(CLED, OUTPUT);
-  digitalWrite(CLED, LOW);
-  ready_to_receive(false);
-  ready_to_send(false);
-  pinMode(RCLK, OUTPUT);
-  digitalWrite(RCLK, LOW);  // must be low
-  pinMode(sclk1, OUTPUT);
-  digitalWrite(sclk1, LOW);  // data shifts to serial data output on the transition from low to high.
-  pinMode(sclk2, OUTPUT);
-  digitalWrite(sclk2, LOW);  // data shifts to serial data output on the transition from low to high.
 
 
   //ready_to_receive(false);
@@ -322,11 +323,14 @@ void loop() {
           // ------------------------------------------------------------------------------
 
           if (first_check == 0) first_check = millis();
+          pastMatrix=true;
           // send urgent messages first
           doUrgentMessage();
           // if the user list is empty, get the list
           // also refresh the userlist when we switch from public to private messaging and vice versa
-          if (users.length() < 1 or msgtype != "public") updateUserlist = true;
+          if (users.length() < 1 or msgtype != "public") { 
+            updateUserlist = true;
+          }
           msgtype = "public";
 
           // do we have any messages in the page buffer?
@@ -449,13 +453,13 @@ void loop() {
           toEncode.trim();
 
           int buflen = toEncode.length() + 1;
-          Serial.print("Buffer len=");
-          Serial.println(buflen);
+          //Serial.print("Buffer len=");
+          //Serial.println(buflen);
           if (buflen <= 1) break;
           char buff[buflen];
           toEncode.toCharArray(buff, buflen);
-          Serial.print("toEncode=");
-          Serial.println(toEncode);
+          //Serial.print("toEncode=");
+          //Serial.println(toEncode);
 
           String Encoded = my_base64_encode(buff, buflen);
 
@@ -582,8 +586,10 @@ void loop() {
           doUrgentMessage();
           // if the user list is empty, get the list
           // also refresh the userlist when we switch from public to private messaging and vice versa
-          if (users.length() < 1 or msgtype != "private") updateUserlist = true;
-
+          if (users.length() < 1 or msgtype != "private") {
+            updateUserlist = true;
+            //Serial.println("Update Userlist");
+          }
           msgtype = "private";
           pmCount = 0;
           // do we have any messages in the page buffer?
@@ -760,7 +766,7 @@ void loop() {
           if (pmCount < 10) { pm = "0" + pm; }
           pm = "[PM:" + pm + "]";
           if (pmCount == 0) pm = "--";
-          Serial.println(pm);
+          //Serial.println(pm);
           send_String_to_Bus(pm);  // then send the number of messages as a string
           break;
         }
@@ -875,12 +881,13 @@ void loop() {
           userpageCount = 0;
           String ul1 = userPages[userpageCount];
           if (ul1.length()<2){
-			  refreshUserPages=true;
-              Serial.println("THE USERLIST IS EMPTY");
+			        refreshUserPages=true;
+              getMessage = false;
+              //Serial.println("THE USERLIST IS EMPTY");
               ul1=".EMPTY";
               send_String_to_Bus(ul1);
           } else {
-          Serial.println(ul1);
+          //Serial.println(ul1);
           send_String_to_Bus(ul1);
           userpageCount++;
           }
@@ -890,11 +897,9 @@ void loop() {
         {
           // Computer asks for user list, second or third group.
           // we send a max of 15 users in one long string
-          Serial.print("GROUP COUNT =");
-          Serial.println(userpageCount);
           String ul1 = userPages[userpageCount];
           if (ul1.length() >2){
-            Serial.println(ul1);
+            //Serial.println(ul1);
             send_String_to_Bus(ul1);
             userpageCount++;
           } else send_String_to_Bus(" ");
@@ -934,8 +939,6 @@ void loop() {
           ready_to_receive(false);
           screenColor = ch;
           dataFromBus=false;
-          Serial.print("new color=");
-          Serial.println(screenColor);
           settings.begin("mysettings", false);
           settings.putUInt("scrcolor", screenColor);
           settings.end();
@@ -1043,11 +1046,11 @@ void receive_buffer_from_Bus(int cnt) {
     ready_to_receive(false);
     dataFromBus = false;
     inbuffer[i] = Atari_to_Ascii(ch);
-    Serial.print(inbuffer[i]);
+    //Serial.print(inbuffer[i]);
     i++;
     if (i > 248) {  //this should never happen
 #ifdef debug
-      Serial.print("Error: inbuffer is about to flow over!");
+      Serial.println("Error: inbuffer is about to flow over!");
 #endif
       ch = 128;
       cnt = 1;
@@ -1057,7 +1060,7 @@ void receive_buffer_from_Bus(int cnt) {
       cnt--;
       inbuffer[i] = 129;
       i++;
-      Serial.println();
+      //Serial.println();
     }
   }
   i--;

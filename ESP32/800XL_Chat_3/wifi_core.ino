@@ -127,7 +127,7 @@ bool SendMessageToServer(String Encoded, String RecipientName, int retryCount, b
 void get_full_userlist() {
   // this is for the user list in the menu (Who is on line?)
   // The second core calls this webpage so the main thread does not suffer performance
-  Serial.println("GET FULL USER LIST");
+  // Serial.println("GET FULL USER LIST");
   for (int p = 0; p < 8; p++) {
     userPages[p] = getUserList(p);    
   }
@@ -323,6 +323,14 @@ void WifiCoreLoop(void* parameter) {
       if (updateUserlist and !getMessage and pastMatrix and !sendingMessage) {
         updateUserlist = false;
         fill_userlist();
+      }
+      if (refreshUserPages){
+        Serial.print("getMessage=");
+        Serial.println(getMessage);
+        Serial.print("pastMatrix=");
+        Serial.println(pastMatrix);
+        Serial.print("sendingMessage=");
+        Serial.println(sendingMessage);
       }
       if (refreshUserPages and !getMessage and pastMatrix and !sendingMessage) {
         refreshUserPages = false;
