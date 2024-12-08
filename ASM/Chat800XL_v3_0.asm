@@ -2381,7 +2381,7 @@ move_cursor                 // move the cursor so it will actually become (in)vi
 //----------------------------------------------------------------------
 // Send the message
 // ----------------------------------------------------------------------
-send_message:
+send_message: 
   lda inhsend
   cmp #1
   bne sm_waitrtr
@@ -2424,7 +2424,7 @@ sendWasGood
   jsr clear_input_lines
   jsr print_pm_user  // print pmuser if we are on screen #3
   rts
-  
+
 // ----------------------------------------------------------------------
 // check if the message is private  
 // ----------------------------------------------------------------------
