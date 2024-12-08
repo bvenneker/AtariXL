@@ -145,8 +145,8 @@ String getUserList(int page) {
   int httpResponseCode = http.POST(httpRequestData);
 
   // debug voor lege userlist
-  Serial.print("==>> response van XLlistUsers.php = ");
-  Serial.println(httpResponseCode);
+  //Serial.print("==>> response van XLlistUsers.php = ");
+  //Serial.println(httpResponseCode);
   // einde debug voor lege userlist
   
   String result = "0";
@@ -362,11 +362,11 @@ void WifiCoreLoop(void* parameter) {
     responseTime = millis() - responseTime;
     if (responseTime > 10000) softReset();
 #ifdef debug
-    Serial.print("http POST took: ");
-    Serial.print(responseTime);
-    Serial.println(" ms.");
-    Serial.print("Response code=");
-    Serial.println(httpResponseCode);
+    //Serial.print("http POST took: ");
+    //Serial.print(responseTime);
+    //Serial.println(" ms.");
+    //Serial.print("Response code=");
+    //Serial.println(httpResponseCode);
 #endif
     if (httpResponseCode == 200) {  // httpResponseCode should be 200
       String textOutput = httpb.getString();  // capture the response from the webpage (it's json)

@@ -2418,6 +2418,7 @@ sendLines
   cmp #0
   beq sendWasGood 
   jsr show_cursor
+  jsr cl_exit
   rts
 sendWasGood  
   mva #0 CURSORINH               // enable the cursor again

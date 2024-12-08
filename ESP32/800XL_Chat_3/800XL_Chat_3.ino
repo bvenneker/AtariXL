@@ -268,7 +268,7 @@ void loop() {
     ready_to_receive(false);  // flow controll
 
 #ifdef debug
-    Serial.printf("incomming command: %d\n", ch);
+    //Serial.printf("incomming command: %d\n", ch);
 #endif
 
     //
@@ -391,11 +391,12 @@ void loop() {
           // start byte 253 = new chat message from Computer to database
           // ------------------------------------------------------------------------------
           // we expect a chat message from the Computer
-
+          
           receive_buffer_from_Bus(1);
 
           String toEncode = "[145]";
           String RecipientName = "";
+          int pmuserlen=0;          
           int mstart = 0;
 
           // Get the RecipientName
@@ -410,7 +411,7 @@ void loop() {
                 }
               } else {
                 mstart = x + 1;
-                toEncode = toEncode + "[145]@" + RecipientName + " ";
+                toEncode = toEncode + "@" + RecipientName + " ";
                 break;
               }
             }
@@ -454,8 +455,9 @@ void loop() {
 
           int buflen = toEncode.length() + 1;
           //Serial.print("Buffer len=");
-          //Serial.println(buflen);
-          if (buflen <= 1) break;
+          //Serial.println(buflen - mstart);
+          //Serial.println(toEncode);
+          if (buflen -mstart <= 7) break;                  // this is an empty message! do not send it.
           char buff[buflen];
           toEncode.toCharArray(buff, buflen);
           //Serial.print("toEncode=");
