@@ -6,7 +6,10 @@
 // https://grandideastudio.com/media/pp_atari8bit_schematic.pdf
 
 // TODO LIST  
-; Auto updates!
+; first setup menus
+; timeout when receiving
+; timeout when sending
+// Auto updates!
 // Aantal prive berichten doorgeven
 // keep last PM user on screen after sending message
 // Bij onbekende user, bericht herstellen
@@ -463,7 +466,7 @@ get_wifi_status:
   rts
 get_wifi_status_cont
   lda #248 
-  jsr sendStartByte    // the first byte in the RXBUFFER now contains 1 or 0
+  jsr send_start_byte    // the first byte in the RXBUFFER now contains 1 or 0
   lda RXBUFFER              // get the first byte of the RXBUFFER
   sta WIFISTATUS            // store the first byte as WIFISTATUS
   rts
@@ -476,7 +479,7 @@ get_status:
   beq exit_gs
 
   lda #236                                      // ask Cartridge for the config status, server name and esp sketch version
-  jsr sendStartByte                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
+  jsr send_start_byte                        // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
   
   lda #1                                        // set the variables up for the splitbuffer command
   sta SLITINDEX                                // we need the first element, so store #1 in SLITINDEX
@@ -789,15 +792,15 @@ ul_start
 
 ul_novice
   lda TEMPBYTE
-  jsr sendStartByte                      // RXBUFFER now contains the first group of users, 20
+  jsr send_start_byte                      // RXBUFFER now contains the first group of users, 20
   displayBuffer RXBUFFER,#4 ,#2,#0
 
   lda #233
-  jsr sendStartByte                      // RXBUFFER now contains the second group of users, 40
+  jsr send_start_byte                      // RXBUFFER now contains the second group of users, 40
   displayBuffer RXBUFFER,#9 ,#2,#0
 
   lda #233
-  jsr sendStartByte                      // RXBUFFER now contains the second group of users, 40
+  jsr send_start_byte                      // RXBUFFER now contains the second group of users, 40
   displayBuffer RXBUFFER,#14 ,#2,#0
 
   displayText DIVIDER_LINE, #22,#0            // draw the divider line
@@ -845,7 +848,7 @@ account_setup:
   jmp acc_vice
 acc_novice
   lda #243                                    // ask for the mac address, registration id, nickname and regstatus
-  jsr sendStartByte                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
+  jsr send_start_byte                      // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128) 
   mva #1 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#14,#0       // Display the buffers on screen (Mac address)
@@ -967,7 +970,7 @@ server_setup:
   jsr jdelay
   
   lda #237                                    // get server connection status
-  jsr sendStartByte
+  jsr send_start_byte
   displayBuffer  RXBUFFER,#23 ,#3,#0          // the RX buffer now contains the server status
   
 svr_vice 
@@ -1039,10 +1042,10 @@ wifi_setup:
   
 wifi_get_cred
   lda #248                                    // ask Cartridge for the wifi credentials
-  jsr sendStartByte
+  jsr send_start_byte
   displayBuffer  RXBUFFER,#23 ,#3,#1          // the RX buffer now contains the wifi status
   lda #251                                    // ask Cartridge for the wifi credentials
-  jsr sendStartByte                           // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
+  jsr send_start_byte                           // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
   mva #1 SLITINDEX                           //
   jsr splitRXbuffer                           //
   displayBuffer  SPLITBUFFER,#5 ,#9,#0        // Display the buffers on screen (SSID name)
@@ -1220,11 +1223,11 @@ check_matrix                                      //
   lda $D502                                       // read from cartridge
   cmp #128                                        // 
                                                   // 
-  beq exitSimCheck                              // if vice mode, we do not try to communicate with the
+  beq exitSimCheck                                // if vice mode, we do not try to communicate with the
   lda #1                                          // cartridge because it will result in error
   sta VICEMODE                                    //  
                                                   //
-exitSimCheck                                    // 
+exitSimCheck                                      // 
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
   jsr jdelay                                      // and call the delay subroutine
@@ -1233,10 +1236,14 @@ exitSimCheck                                    //
 // ---------------------------------------------------------------------
 // Send a command byte to the cartridge and wait for response;
 // ---------------------------------------------------------------------
-sendStartByte:                     //
+send_start_byte:                          //
   jsr wait_for_RTR
   sta $D502                             // send the command byte
   ldx #0
+  lda $14
+  sta tempt
+  lda #200                              // set a timeout
+  sta $14                               // $14 is one of the clocks
 ff_response_loop                        // now wait for a response
   jsr wait_for_RTS
   lda $D502
@@ -1244,14 +1251,25 @@ ff_response_loop                        // now wait for a response
   cmp #128
   beq ff_end_buffer
   inx
+  lda $14
+  cmp #0
+  beq ssb_timeout
   jmp ff_response_loop
   
 ff_end_buffer
   inx
   lda #128
   sta RXBUFFER,x
+  lda tempt
+  sta $14
   rts
-  
+
+ssb_timeout  
+  lda #128                                 // we did get a response in time (byte 128 was not received)  
+  sta RXBUFFER
+  lda tempt
+  sta $14
+  rts
 // ----------------------------------------------------------------------
 // Wait until the cartridge is ready to receive data (RTR)
 // ----------------------------------------------------------------------
@@ -1315,7 +1333,7 @@ check_priv_or_pub
 check_is_publ
   lda #254
 check_ff
-  jsr sendStartByte  // RX buffer now contains a message or 128
+  jsr send_start_byte  // RX buffer now contains a message or 128
   lda RXBUFFER
   cmp #128
   beq getNumberOfPrivateMessages
@@ -1327,7 +1345,7 @@ getNumberOfPrivateMessages
   cmp #3 
   beq check_exit
   lda #241
-  jsr sendStartByte
+  jsr send_start_byte
   mva COLCRS savecc
   mva ROWCRS savecr
   lda RXBUFFER
@@ -1413,7 +1431,7 @@ checkForUpdates
   cmp #128
   bne exitVersions
   lda #239
-  jsr sendStartByte
+  jsr send_start_byte
   lda RXBUFFER        // if there is a new version, RXBUFFER contains the new version numbers 
   cmp #128            // or it could contain nothing, just 128 if there is no new version
   bne getVersions 
@@ -2413,7 +2431,7 @@ sendLines
   sta $D502
     
   lda #249 
-  jsr sendStartByte   // get the result of the send action
+  jsr send_start_byte   // get the result of the send action
   lda RXBUFFER
   cmp #0
   beq sendWasGood 
@@ -2564,7 +2582,7 @@ calculate_screen_addresses:
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.78',128
+VERSION .byte '3.76',128
 VERSION_DATE .byte '12/2024',128
 .local VERSION_LINE
 .byte ' Version  ROM x.xx  ESP x.xx    12/2024'
@@ -2825,6 +2843,7 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
 inhsend  .byte 0
 doswitch .byte 0
 restoreMessageLines .byte 0
+tempt    .byte 0
 blink    .byte 0,0
 blink2   .byte 0,0
 ddlist   .word 0,0

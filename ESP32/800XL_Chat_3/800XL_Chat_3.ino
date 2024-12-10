@@ -321,7 +321,6 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
-
           if (first_check == 0) first_check = millis();
           pastMatrix=true;
           // send urgent messages first
