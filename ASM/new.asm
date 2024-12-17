@@ -2631,13 +2631,13 @@ CUSTOM_CHARS:                                     // custom chars for big letter
   .byte 24,24,24,248,248,24,24,24                 // #14 T to left
   .byte 170,127,222,117,234,119,234,85            // #15 stardust
                                                   //
-SC_STARS1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255
-SC_STARS2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255
+SC_STARS1 .byte 35,74,75,76,115,52,91,92,93,132,105,144,145,146,185,82,121,122,123,162,255//
+SC_STARS2 .byte 6,45,46,47,86, 25,65,64,66,105, 93,132,133,134,173, 76,115,116,117,156,255//
                                                   //
 CONFIRMUPDATE: .byte "UPDATE!",128                //
                                                   //
-UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
-.byte $12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,5,$9b
+UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12//
+.byte $12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,5,$9b//
 .byte $20,$20,$7c                                 //
 :32 .byte $20                                     //
 .byte $7c,$9b,$20,$20,$1A                         //
@@ -2743,25 +2743,25 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
                                                   //
 .local TEXT_HELP_SCREEN                           //
 .byte 'HELP',$9b,$9b                              //
-.byte 'Use Ctrl-Return to send your message immediately',$9b
-.byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'
+.byte 'Use Ctrl-Return to send your message immediately',$9b//
+.byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'//
 .byte ' start your message with @username'        //
                                                   //
 .endl                                             //
                                                   //
 .local TEXT_HELP_SCREEN2                          //
-.byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with'
+.byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with'//
 .endl                                             //
                                                   //
 .local TEXT_ABOUT_SCREEN                          //
 .byte 'ABOUT CHAT64',$9b,$9b                      //
-.byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B
-.byte 'A new version of CHAT64 is now availableto everyone.',$9B
-.byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B
+.byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B//
+.byte 'A new version of CHAT64 is now availableto everyone.',$9B//
+.byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B//
 .endl                                             //
 .local TEXT_ABOUT_SCREEN2                         //
-.byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B
-.byte 'Hardware, software and manuals are available on Github',$9B,$9B
+.byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B//
+.byte 'Hardware, software and manuals are available on Github',$9B,$9B//
 .byte 'github.com/bvenneker/Chat64-Atari800'      //
 .endl                                             //
                                                   //
@@ -2857,7 +2857,7 @@ STARTLINE4 .byte 0,0                              // start address when message 
 STARTLINE3 .byte 0,0                              // start address when message is 3 lines
 STARTLINE2 .byte 0,0                              // start address when message is 2 lines
 STARTLINE1 .byte 0,0                              // start address when message is 1 lines
-PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128
+PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128//
 RXBUFFER :150 .byte 128                           //
 SPLITBUFFER :40 .byte 128                         //
                                                   //
