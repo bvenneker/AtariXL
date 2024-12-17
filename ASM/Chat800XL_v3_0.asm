@@ -1,5 +1,4 @@
 // special characters: https://www.youtube.com/watch?v=fOrMwNBoC7E&list=PLmzSn5Wy9uF8nTsZBtdk1yHzFI5JXoUJT&index=7
-                                                  //
 // https://www.atarimax.com/jindroush.atari.org/acarts.html
 // https://atariwiki.org/wiki/Wiki.jsp?page=CartridgesexitVersions
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
@@ -14,7 +13,6 @@
 // keep last PM user on screen after sending message
 // Bij onbekende user, bericht herstellen
 // Kleur veranderen!
-                                                  //
 // escape moet exit menu zijn, altijd
 // Shift Clear, Control clear
 // Caps key geeft rare tekens (ook met shift en contrl)
@@ -30,8 +28,7 @@
 // labels camelCase
 // variables ALLCAPS
                                                   //
-putchar_ptr = $346                                // pointer to print routine   
-                                                  //
+putchar_ptr = $346                                // pointer to print routine
 WSYNC     = $d40a                                 //
 NMIEN     = $d40e                                 //
 VDSLST    = $0200                                 //
@@ -57,18 +54,18 @@ TEXTBOXLEN = $1A                                  // length of the input field
 CHARINDEX = $3f                                   //
 TEXTPOINTER = $40                                 // $40, $41 are a pointer.
 TEXTLEN = $83                                     //
-ROWCRS = $54                                      // cursor row 
-COLCRS = $55                                      // cursor colm 
+ROWCRS = $54                                      // cursor row
+COLCRS = $55                                      // cursor colm
 MESSAGEFIELD = $43                                // 43 and 44 hold a pointer to the main input field
                                                   //
 SLITINDEX = $46                                   //
                                                   //
                                                   //
-CURSORINH = $2F0                                  // cursor inhibit, cursor is invisible if value is not zero 
-SCREENMEMORYPOINTER = $58                         // zero page pointer to screen memory 
+CURSORINH = $2F0                                  // cursor inhibit, cursor is invisible if value is not zero
+SCREENMEMORYPOINTER = $58                         // zero page pointer to screen memory
                                                   //
                                                   //
-org $2000                                         // program starts at $2000      
+org $2000                                         // program starts at $2000
                                                   //
 init                                              //
 mva #0 $52                                        // set left margin to zero  //
@@ -155,9 +152,9 @@ jmp restore_screen                                //
                                                   //
 p_chat                                            //
 jsr clear_keyboard_and_screen                     //
-displayText DIVIDER_LINE, #0,#0                   // draw the divider line 
-displayText TEXT_F5_TOGGLE, #1,#0                 // draw the menu title 
-displayText DIVIDER_LINE, #2,#0                   // draw the divider line 
+displayText DIVIDER_LINE, #0,#0                   // draw the divider line
+displayText TEXT_F5_TOGGLE, #1,#0                 // draw the menu title
+displayText DIVIDER_LINE, #2,#0                   // draw the divider line
 jmp chat_screen                                   //
                                                   //
                                                   //
@@ -184,9 +181,9 @@ displayText TEXT_NO_CARTRIDGE, #5,#6              //
                                                   //
 mc_not_vice                                       //
                                                   //
-mva #255 $2fc                                     // clear keyboard buffer 
-mva #0 COLCRS                                     // set cursor row position to zero 
-displayText DIVIDER_LINE, #20,#0                  // draw the divider line 
+mva #255 $2fc                                     // clear keyboard buffer
+mva #0 COLCRS                                     // set cursor row position to zero
+displayText DIVIDER_LINE, #20,#0                  // draw the divider line
                                                   //
 jsr clear_input_lines                             //
                                                   //
@@ -529,9 +526,9 @@ main_menu:                                        //
 jsr displayUpdateScreen                           //
 mva #10 MENU_ID                                   //
 jsr clear_keyboard_and_screen                     //
-displayText DIVIDER_LINE, #0,#0                   // draw the divider line 
-displayText text_main_menu, #1,#15                // draw the menu title 
-displayText DIVIDER_LINE, #2,#0                   // draw the divider line 
+displayText DIVIDER_LINE, #0,#0                   // draw the divider line
+displayText text_main_menu, #1,#15                // draw the menu title
+displayText DIVIDER_LINE, #2,#0                   // draw the divider line
 displayText MLINE_MAIN1, #5,#3                    //
 displayText MLINE_MAIN2, #7,#3                    //
 displayText MLINE_MAIN3, #9,#3                    //
@@ -540,8 +537,8 @@ displayText MLINE_MAIN5, #13,#3                   //
 displayText MLINE_MAIN6, #15,#3                   //
 displayText MLINE_MAIN8, #17,#3                   //
 displayText MLINE_MAIN7, #19,#3                   //
-displayText DIVIDER_LINE, #22,#0                  // draw the divider line 
-displayText VERSION_LINE, #23,#0                  // draw the version line 
+displayText DIVIDER_LINE, #22,#0                  // draw the divider line
+displayText VERSION_LINE, #23,#0                  // draw the version line
 displayBuffer SWVERSION,#23,#24,#0                //
 displayBuffer VERSION,#23,#14,#0                  //
                                                   //
@@ -746,17 +743,17 @@ jsr clear_keyboard_and_screen                     //
 // ----------------------------------------------------------------------
 // Help screen
 // ----------------------------------------------------------------------
-help_screen:                                      // 
-  mva #16 MENU_ID                                 // 
-  jsr clear_keyboard_and_screen                   // 
+help_screen:                                      //
+  mva #16 MENU_ID                                 //
+  jsr clear_keyboard_and_screen                   //
   displayText DIVIDER_LINE, #0,#0                 // draw the divider line
   displayText TEXT_HELP_SCREEN, #1,#15            // draw the menu title and text
   displayText TEXT_HELP_SCREEN2, #10,#0           // draw more text
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
   displayText MLINE_MAIN7, #23,#1                 // draw the menu on the bottom line
-                                                  // 
-help_get_key_input                                // 
+                                                  //
+help_get_key_input                                //
   jsr getKey                                      // wait for a key
   cmp #251                                        // wait for ESC key
   bne help_get_key_input                          // if not, wait for key again
@@ -847,17 +844,17 @@ jmp acc_vice                                      //
 acc_novice                                        //
   lda #243                                        // ask for the mac address, registration id, nickname and regstatus
   jsr send_start_byte                             // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128)
-  mva #1 SLITINDEX                                // 
-  jsr splitRXbuffer                               // 
+  mva #1 SLITINDEX                                //
+  jsr splitRXbuffer                               //
   displayBuffer  SPLITBUFFER,#5 ,#14,#0           // Display the buffers on screen (Mac address)
-  mva #2 SLITINDEX                                // 
-  jsr splitRXbuffer                               // 
+  mva #2 SLITINDEX                                //
+  jsr splitRXbuffer                               //
   displayBuffer  SPLITBUFFER,#7 ,#18,#0           // Display the buffers on screen (registration id)
-  mva #3 SLITINDEX                                // 
-  jsr splitRXbuffer                               // 
+  mva #3 SLITINDEX                                //
+  jsr splitRXbuffer                               //
   displayBuffer  SPLITBUFFER,#9 ,#12,#0           // Display the buffers on screen (Nick Name)
-  mva #4 SLITINDEX                                // 
-  jsr splitRXbuffer                               // 
+  mva #4 SLITINDEX                                //
+  jsr splitRXbuffer                               //
 lda SPLITBUFFER                                   //
   cmp #120                                        // 120 = x  some unknown error
 bne cp_114                                        //
@@ -870,7 +867,7 @@ displayText text_reg_r,#23 ,#5                    //
 jmp acc_input_fields                              //
 cp_117                                            //
   cmp #117                                        // 117 = u
-  bne cp_110                                      // 
+  bne cp_110                                      //
 displayText text_reg_u,#23 ,#4                    //
 jmp acc_input_fields                              //
 cp_110                                            //
@@ -878,25 +875,25 @@ cp_110                                            //
 bne acc_input_fields                              //
 displayText text_reg_n,#23 ,#5                    //
                                                   //
-acc_vice                                          // 
-acc_input_fields                                  // 
+acc_vice                                          //
+acc_input_fields                                  //
   mva #7 ROWCRS                                   // Put the cursor in the registration id field
-  mva #17 COLCRS                                  // 
+  mva #17 COLCRS                                  //
 jsr show_cursor                                   //
-  mva #19 FIELD_MIN                               // 
-  mva #35 FIELD_MAX                               // 
-  lda #32                                         // 
-  jsr write_text                                  // 
-  jsr text_input                                  // 
+  mva #19 FIELD_MIN                               //
+  mva #35 FIELD_MAX                               //
+  lda #32                                         //
+  jsr write_text                                  //
+  jsr text_input                                  //
                                                   //
   mva #255 $2fc                                   // Clear keyboard buffer
   mva #9 ROWCRS                                   // Put the cursor in the Nick Name field
-  mva #11 COLCRS                                  // 
-  mva #13 FIELD_MIN                               // 
-  mva #21 FIELD_MAX                               // 
-  lda #32                                         // 
-  jsr write_text                                  // 
-  jsr text_input                                  // 
+  mva #11 COLCRS                                  //
+  mva #13 FIELD_MIN                               //
+  mva #21 FIELD_MAX                               //
+  lda #32                                         //
+  jsr write_text                                  //
+  jsr text_input                                  //
 jsr hide_cursor                                   //
                                                   //
 displayText text_start_save_settings, #13,#3      //
@@ -972,11 +969,11 @@ jsr send_start_byte                               //
   displayBuffer  RXBUFFER,#23 ,#3,#0              // the RX buffer now contains the server status
                                                   //
 svr_vice                                          //
-svr_input_fields                                  // 
+svr_input_fields                                  //
   mva #5 ROWCRS                                   // Put the cursor in the Server Name field
-  mva #13 COLCRS                                  // 
-  mva #15 FIELD_MIN                               // 
-  mva #38 FIELD_MAX                               // 
+  mva #13 COLCRS                                  //
+  mva #15 FIELD_MIN                               //
+  mva #38 FIELD_MAX                               //
 lda #32                                           //
 jsr write_text                                    //
 jsr show_cursor                                   //
@@ -1225,7 +1222,7 @@ rts                                               //
 // ---------------------------------------------------------------------
 // Send a command byte to the cartridge and wait for response//
 // ---------------------------------------------------------------------
-send_start_byte:                                  // 
+send_start_byte:                                  //
 jsr wait_for_RTR                                  //
   sta $D502                                       // send the command byte
 ldx #0                                            //
@@ -1351,7 +1348,6 @@ jsr show_cursor                                   //
 check_exit                                        //
 rts                                               //
                                                   //
-//LINEC .byte 0
 savex .byte 0                                     //
 savecr .byte 0                                    //
 savecc .byte 0                                    //
@@ -1425,7 +1421,6 @@ jsr send_start_byte                               //
   cmp #128                                        // or it could contain nothing, just 128 if there is no new version
 bne getVersions                                   //
 rts                                               //
-                                                  //
                                                   //
 getVersions                                       //
 ldy #0                                            //
@@ -1592,7 +1587,7 @@ delok                                             //
   lda #$1C                                        // to column 39 on that SAME LINE.. so we have to correct
   jsr write_text                                  // that too..
 delcont                                           // Man this is getting ugly..
-  lda #32                                         // 
+  lda #32                                         //
   jsr write_text                                  // anyway, it works now. get over it, move on, have a beer
 lda #$1E                                          //
 jsr write_text                                    //
@@ -1735,7 +1730,7 @@ jmp exit_bc                                       //
                                                   //
                                                   // ROWCRS = $54
                                                   // COLCRS = $55
-                                                  // 
+                                                  //
                                                   //
 exit_bc                                           //
 rts                                               //
@@ -1968,25 +1963,25 @@ kb2asci:                                          //
 getKey:                                           //
   jsr readRTS                                     // check for incomming data or reset request
   lda $D01F                                       // is one of the console keys pressed?
-  and #7                                          // 
-  cmp #6                                          // 
-  beq prSTART                                     // 
-  cmp #5                                          // 
-  beq prSELECT                                    // 
-  cmp #3                                          // 
-  beq prOPTION                                    // 
-                                                  // 
-chkBreak                                          // 
+  and #7                                          //
+  cmp #6                                          //
+  beq prSTART                                     //
+  cmp #5                                          //
+  beq prSELECT                                    //
+  cmp #3                                          //
+  beq prOPTION                                    //
+                                                  //
+chkBreak                                          //
   lda $0011                                       // is the break key pressed?
-  cmp #0                                          // 
-  bne chkHelp                                     // 
+  cmp #0                                          //
+  bne chkHelp                                     //
   rts                                             // return with zero
-                                                  // 
-chkHelp                                           // 
+                                                  //
+chkHelp                                           //
   lda $02DC                                       // is the HELP key pressed ?
-  and #1                                          // 
-  cmp #1                                          // 
-  beq prHELP                                      // 
+  and #1                                          //
+  cmp #1                                          //
+  beq prHELP                                      //
                                                   //
                                                   //
 readKeyboardBuffer                                //
@@ -1995,60 +1990,60 @@ readKeyboardBuffer                                //
   beq exit_getkey                                 // exit if no key
                                                   //
 keyConvert                                        // convert the key code to ascii
-  tay                                             // 
-  lda kb2asci,y                                   // 
-exit_getkey                                       // 
-  rts                                             // 
-                                                  // 
-prOPTION                                          // 
+  tay                                             //
+  lda kb2asci,y                                   //
+exit_getkey                                       //
+  rts                                             //
+                                                  //
+prOPTION                                          //
   lda $D01F                                       // wait until the key is released
-  and #4                                          // 
-  cmp #0                                          // 
-  beq prOPTION                                    // 
-  lda #251                                        // 
-  rts                                             // 
-                                                  // 
-prSELECT                                          // 
+  and #4                                          //
+  cmp #0                                          //
+  beq prOPTION                                    //
+  lda #251                                        //
+  rts                                             //
+                                                  //
+prSELECT                                          //
   lda $D01F                                       // wait until the key is released
-  and #2                                          // 
-  cmp #0                                          // 
-  beq prSELECT                                    // 
-  lda #252                                        // 
-  rts                                             // 
-                                                  // 
-prSTART                                           // 
+  and #2                                          //
+  cmp #0                                          //
+  beq prSELECT                                    //
+  lda #252                                        //
+  rts                                             //
+                                                  //
+prSTART                                           //
   lda $D01F                                       // wait until the key is released
-  and #1                                          // 
-  cmp #0                                          // 
-  beq prSTART                                     // 
-  lda #253                                        // 
-  rts                                             // 
-                                                  // 
-prHelp                                            // 
-  lda #0                                          // 
+  and #1                                          //
+  cmp #0                                          //
+  beq prSTART                                     //
+  lda #253                                        //
+  rts                                             //
+                                                  //
+prHelp                                            //
+  lda #0                                          //
   sta $02DC                                       // This address is latched and must be
   lda #254                                        // reset to zero after being read
-  rts                                             // 
+  rts                                             //
                                                   //
 //=========================================================================================================
 //    SUB ROUTINE TO SPLIT RXBUFFER
 //=========================================================================================================
-splitRXbuffer:                                    // 
+splitRXbuffer:                                    //
                                                   // RXBUFFER now contains FOR EXAMPLE macaddress[129]regid[129]nickname[129]regstatus[128]
     ldx #0                                        // load zero into x and y
-    ldy #0                                        // 
+    ldy #0                                        //
 sp_read:                                          // read a byte from the index buffer
     lda RXBUFFER,x                                // copy that byte to the split buffer
     sta SPLITBUFFER,y                             // until we find byte 129
-    cmp #129                                      // 
-    beq sp_n                                      // 
+    cmp #129                                      //
+    beq sp_n                                      //
     cmp #128                                      // or the end of line character
-    beq sp_n                                      // 
+    beq sp_n                                      //
     inx                                           // increase the x index
     iny                                           // and also the y index
     jmp sp_read                                   // back to the start to get the next character
-sp_n:                                             // 
-    lda #128                                      // 
+sp_n:                                             //
+    lda #128                                      //
     sta SPLITBUFFER,y                             // load 128 (the end byte) into the splitbuffer
     dec SLITINDEX                                 // decrease $02. This address holds a number that indicates
     lda SLITINDEX                                 // which word we need from the RXBUFFER
@@ -2058,9 +2053,9 @@ sp_n:                                             //
     inx                                           // we reset the y index,
     jmp sp_read                                   // increase the x index
                                                   // and get the next word from the RX buffer
-sp_exit:                                          // 
+sp_exit:                                          //
     rts                                           // return.
-                                                  // 
+                                                  //
 // ----------------------------------------------------------------------
 // Start Screen
 // ----------------------------------------------------------------------
@@ -2372,19 +2367,19 @@ resetAtari:                                       //
 //----------------------------------------------------------------------
 // Hide or show the cursor
 //----------------------------------------------------------------------
-hide_cursor:                                      // 
+hide_cursor:                                      //
   mva #1 CURSORINH                                // hide the cursor
-  jmp move_cursor                                 // 
-                                                  // 
-show_cursor:                                      // 
+  jmp move_cursor                                 //
+                                                  //
+show_cursor:                                      //
   mva #0 CURSORINH                                // show the cursor
 move_cursor                                       // move the cursor so it will actually become (in)visible
   lda #28                                         // up one line
-  jsr write_text                                  // 
+  jsr write_text                                  //
   lda #29                                         // down one line
-  jsr write_text                                  // 
-  rts                                             // 
-                                                  // 
+  jsr write_text                                  //
+  rts                                             //
+                                                  //
 //----------------------------------------------------------------------
 // Send the message
 // ----------------------------------------------------------------------
@@ -2525,9 +2520,9 @@ beq fin_pmuser                                    //
 beq fin_pmuser                                    //
   cmp #14                                         // full stop
 beq fin_pmuser                                    //
-  cmp #26                                         // 
+  cmp #26                                         //
 beq fin_pmuser                                    //
-  cmp #27                                         // 
+  cmp #27                                         //
 beq fin_pmuser                                    //
 iny                                               //
 jmp getPmUser                                     //
