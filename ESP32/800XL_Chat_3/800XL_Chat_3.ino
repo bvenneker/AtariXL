@@ -318,6 +318,7 @@ void loop() {
     switch (ch) {
       case 254:
         {
+          Serial.println("Incomming 254");
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
@@ -340,7 +341,6 @@ void loop() {
           // find first {
           while (cc != '{' and p < 10) {
             cc = multiMessageBufferPub[pos0++];
-
             p++;
           }
           // fill buffer until we find '}'
@@ -368,9 +368,11 @@ void loop() {
           }
 
           if (haveMessage == 1) {
+            Serial.println("Yes, we have a message");
             translateAtariMessage();
             // and send the outbuffer
             send_out_buffer_to_Bus();
+            Serial.println("Send to bus done");
             // store the new message id
             if (haveMessage == 1) {
               // store the new message id
@@ -378,9 +380,10 @@ void loop() {
             }
             haveMessage = 0;
           } else {  // no public messages :-(
+            Serial.println("No message");
             sendByte(128);
           }
-
+          Serial.println("Done, break");
           break;
         }
 
@@ -508,15 +511,18 @@ void loop() {
           String ns = bns;
 
           ssid = getValue(ns, 129, 0);
-
+          ssid = ssid.substring(0,27);
+          
           ssid.trim();
           Serial.print("SSID=");
           Serial.println(ssid);
           password = getValue(ns, 129, 1);
+          password=password.substring(0,23);
           password.trim();
           Serial.print("PASW=");
           Serial.println(password);
           timeoffset = getValue(ns, 129, 2);
+          timeoffset = timeoffset.substring(0,5);
           timeoffset.trim();
           Serial.print("GMT+=");
           Serial.println(timeoffset);
@@ -643,7 +649,7 @@ void loop() {
             sendByte(128);
             pmCount = 0;
           }
-
+          Serial.println("Done, Break");
           break;
         }
 
@@ -783,7 +789,9 @@ void loop() {
           String ns = bns;
 
           regID = getValue(ns, 129, 0);
+          regID=regID.substring(0,16);
           regID.trim();
+          
 #ifdef debug
           Serial.println(regID);
 #endif
@@ -794,6 +802,7 @@ void loop() {
             break;
           }
           myNickName = getValue(ns, 129, 1);
+          myNickName = myNickName.substring(0,10);
           myNickName.trim();
           myNickName.replace(' ', '_');
 #ifdef debug

@@ -1211,6 +1211,7 @@ exit_wait                                         //
   lda #48                                         // 
   sta TEXT_COUNTER+2                              // 
   displayText text_empty_line, #13,#0             // 
+  displayText text_empty_line, #23,#0             //
   jsr get_status                                  // 
   jmp wifi_get_cred                               // 
                                                   // 
@@ -2615,7 +2616,7 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.77',128                          // 
+VERSION .byte '3.78',128                          // 
 VERSION_DATE .byte '12/2024',128                  // 
                                                   // 
 .local VERSION_LINE                               // 
@@ -2701,7 +2702,7 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .lend                                           // 
                                                   // 
   .local text_empty_line                          // 
-  .byte '                                     '   // 
+  .byte '                                      '  // 
   .endl                                           // 
                                                   // 
   .local TEXT_USER_LIST                           // 

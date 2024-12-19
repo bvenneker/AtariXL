@@ -194,10 +194,23 @@ String getValue(String data, char separator, int index) {
       strIndex[1] = (i == maxIndex) ? i + 1 : i;
     }
   }
-  r = found > index ? data.substring(strIndex[0], strIndex[1]) : "";
-#ifdef zxspectrum
-  // remove the last char (=128)
-  r.remove(r.length()-1);
-#endif
+   
+  if (found > index){
+    r= data.substring(strIndex[0], strIndex[1]);
+    // delete last character if string ends with garbage (happens on Atari)    
+    int lc = r.charAt(r.length()-1);
+    if ( lc > 126  or lc < 32) {
+      Serial.println(lc);
+      Serial.println(r);
+      r.remove(r.length()-1);
+      Serial.println("REMOVED LAST CHAR");
+      Serial.println(r);
+    }
+  } else {
+     r="";
+  }
+
+  
+
   return r;
 }
