@@ -1387,6 +1387,8 @@ wait_for_RTS:                                     //
 // Check for messages
 // ----------------------------------------------------------------------
 check_for_messages:                               // 
+  lda #0                                          // reset the ATTRAC byte, https://www.atariarchives.org/mmm/page_zero.php
+  sta $004D                                       // to prevent the color change after 10 minutes or so..
   lda MENU_ID                                     // 
   cmp #0                                          // 
   beq check_cont                                  // 
