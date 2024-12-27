@@ -1598,6 +1598,7 @@ cpstart                                           //
   cmp #10                                         // 
   bcs key_loop                                    // 
   mva #255 $2fc                                   // clear keyboard buffer
+start_send                                        //
   jsr check_private                               // check if users tries to send a private message
   jsr send_message                                // 
   mva #0 inhsend                                  // 
@@ -1732,7 +1733,7 @@ exit_on_return                                    //
                                                   // 
 handle_return_send                                // 
   mva #255 $2fc                                   // 
-  jsr send_message                                // 
+  jmp start_send                                  // 
   jmp key_loop                                    // 
                                                   // 
 handle_up                                         // 
@@ -2616,7 +2617,7 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.78',128                          // 
+VERSION .byte '3.79',128                          // 
 VERSION_DATE .byte '12/2024',128                  // 
                                                   // 
 .local VERSION_LINE                               // 
