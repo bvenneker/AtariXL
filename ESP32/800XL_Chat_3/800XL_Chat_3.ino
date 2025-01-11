@@ -38,7 +38,8 @@ char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
 int screenColor = 0;
-
+unsigned long hangup =0;
+int lastCommand =0;
 WiFiCommandMessage commandMessage;
 WiFiResponseMessage responseMessage;
 
@@ -223,6 +224,7 @@ void setup() {
 
     settings.end();
     pastMatrix = true;
+    hangup=millis();
   }
   settings.begin("mysettings", false);
   settings.putInt("doReset", 0);
@@ -266,9 +268,9 @@ void loop() {
   if (dataFromBus) {
     dataFromBus = false;
     ready_to_receive(false);  // flow controll
-
+    lastCommand=ch;
 #ifdef debug
-    //Serial.printf("incomming command: %d\n", ch);
+    Serial.printf("incomming command: %d\n", lastCommand);
 #endif
 
     //
@@ -318,7 +320,8 @@ void loop() {
     switch (ch) {
       case 254:
         {
-          Serial.println("Incomming 254");
+          hangup = millis();
+          //Serial.println("Incomming 254");
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
@@ -368,11 +371,9 @@ void loop() {
           }
 
           if (haveMessage == 1) {
-            Serial.println("Yes, we have a message");
             translateAtariMessage();
             // and send the outbuffer
             send_out_buffer_to_Bus();
-            Serial.println("Send to bus done");
             // store the new message id
             if (haveMessage == 1) {
               // store the new message id
@@ -380,10 +381,10 @@ void loop() {
             }
             haveMessage = 0;
           } else {  // no public messages :-(
-            Serial.println("No message");
+            //Serial.println("No message");
             sendByte(128);
           }
-          Serial.println("Done, break");
+          //Serial.println("Done, break");
           break;
         }
 
@@ -588,7 +589,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 247 = Computer triggers call to the website for new private message
           // ------------------------------------------------------------------------------
-
+          hangup=millis();
           // send urgent messages first
           doUrgentMessage();
           // if the user list is empty, get the list
@@ -649,7 +650,7 @@ void loop() {
             sendByte(128);
             pmCount = 0;
           }
-          Serial.println("Done, Break");
+          //Serial.println("Done, Break");
           break;
         }
 
@@ -974,6 +975,12 @@ void loop() {
 
   }  // end of "if (dataFromBus)"
   else {
+    if ((lastCommand==247 or lastCommand==254 or lastCommand==239 or lastCommand==241) and (millis() - hangup) > 2000){
+       hangup=millis();
+       sendByte(128);
+       Serial.print("                     Prevented hangup with command ");
+       Serial.println(lastCommand);
+    }
     // No data from computer bus
   }
 }  // end of main loop

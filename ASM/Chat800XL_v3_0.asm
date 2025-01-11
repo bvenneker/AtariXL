@@ -4,31 +4,7 @@
 // https://atariwiki.org/wiki/Wiki.jsp?page=CartridgesexitVersions
 // https://grandideastudio.com/media/pp_atari8bit_instructions.pdf
 // https://grandideastudio.com/media/pp_atari8bit_schematic.pdf
-                                                  // 
-// TODO LIST  
-; first setup menus                               // 
-; timeout when receiving                          // 
-; timeout when sending                            // 
-// Auto updates!
-// Aantal prive berichten doorgeven
-// keep last PM user on screen after sending message
-// Bij onbekende user, bericht herstellen
-// Kleur veranderen!
-                                                  // 
-// escape moet exit menu zijn, altijd
-// Shift Clear, Control clear
-// Caps key geeft rare tekens (ook met shift en contrl)
-// Invert key geeft rare tekens
-// ESC key stuurt cursor omhoog!
-// TAB key geeft rare tekens
-// shift insert moet ook gewoon > geven
-// Return op onderste regel moet bericht verzenden
-// Control 7 geeft raar karakter
-; Control 1 = pause screen output. Kunnen we dat uitzetten?// 
-// Control return geeft L (moet onmiddelijk verzenden)
-// 
-// labels camelCase
-// variables ALLCAPS
+                                                  //
                                                   // 
 putchar_ptr = $346                                // pointer to print routine
                                                   // 
@@ -59,9 +35,8 @@ TEXTPOINTER = $40                                 // $40, $41 are a pointer.
 TEXTLEN = $83                                     // 
 ROWCRS = $54                                      // cursor row
 COLCRS = $55                                      // cursor colm
-MESSAGEFIELD = $43                                // 43 and 44 hold a pointer to the main input field
-                                                  // 
-SLITINDEX = $46                                   // 
+MESSAGEFIELD = $43                                // 43 and 44 hold a pointer to the main input field 
+SPLITINDEX = $46                                  // 
                                                   // 
                                                   // 
 CURSORINH = $2F0                                  // cursor inhibit, cursor is invisible if value is not zero
@@ -72,9 +47,11 @@ SCREENMEMORYPOINTER = $58                         // zero page pointer to screen
                                                   // 
 init                                              // 
   mva #0 $52                                      // set left margin to zero
+  clc                                             // we need to do some addition, so clear the carry bit first
   lda SCREENMEMORYPOINTER                         // load the lowbyte of the pointer for screen memory
   adc #72                                         // add 72
   sta MESSAGEFIELD                                // store in $43
+  clc                                             // we need to do some addition, so clear the carry bit first
   lda SCREENMEMORYPOINTER+1                       // load the high byte
   adc #3                                          // add 3
   sta MESSAGEFIELD+1                              // store in $44.
@@ -106,6 +83,7 @@ main                                              //
                                                   // 
 jmp_main_menu                                     // 
   jmp main_menu                                   // 
+
 // ----------------------------------------------------------------------
 // Print the last used pmuser on screen to start your private message
 // ----------------------------------------------------------------------
@@ -116,7 +94,7 @@ print_pm_user:                                    //
   rts                                             // 
 print_pm_continue                                 // 
   mwa MESSAGEFIELD TEMP_I                         // 
-  dec TEMP_I                                      // 
+//  dec TEMP_I                                      // 
   ldy #0                                          // 
   sty COLCRS                                      // 
   lda #28                                         // move the cursor out of the way
@@ -194,7 +172,6 @@ mc_not_vice                                       //
   displayText DIVIDER_LINE, #20,#0                // draw the divider line
                                                   // 
   jsr clear_input_lines                           // 
-                                                  // 
 chat_key_input                                    // 
   jsr hide_cursor                                 // 
   jsr restore_message_lines                       // 
@@ -280,7 +257,7 @@ bs_c                                              //
                                                   // 
 backup_priv_screen                                // 
   mva COLCRS PCURSORX                             // 
-  mva TEMPBYTE PCURSORX                           // 
+  mva TEMPBYTE PCURSORY                           // 
   mva #1 HAVE_P_BACKUP                            // 
   mva #<SCREEN_PRIV_BACKUP TEMP_I                 // 
   mva #>SCREEN_PRIV_BACKUP TEMP_I+1               // 
@@ -344,9 +321,7 @@ restore_screen:                                   //
 restore_priv_screen                               // 
   lda HAVE_P_BACKUP                               // 
   cmp #1                                          // 
-  beq do_p_restore                                // 
-//  mva PCURSORX COLCRS    // restore the cursor position
-//  mva PCURSORY ROWCRS    // restore the cursor position  
+  beq do_p_restore                                //  
   jmp p_chat                                      // 
 do_p_restore                                      // 
   mva #<SCREEN_PRIV_BACKUP TEMP_I                 // 
@@ -412,7 +387,7 @@ backup_message:                                   //
   jsr move_cursor_out_of_the_way                  // 
   ldy #0                                          // 
   mwa MESSAGEFIELD TEMP_I                         // 
-  dec TEMP_I                                      // 
+//  dec TEMP_I                                      // 
 ml_b_loop                                         // backup message lines
   lda (TEMP_I),y                                  // 
   sta MESSAGE_LINES_BACKUP,y                      // 
@@ -441,7 +416,7 @@ restore_message_lines:                            //
   jsr move_cursor_out_of_the_way                  // 
   ldy #0                                          // 
   mwa MESSAGEFIELD TEMP_I                         // 
-  dec TEMP_I                                      // 
+//  dec TEMP_I                                      // 
 rms_loop                                          // 
   lda MESSAGE_LINES_BACKUP,y                      // 
   sta (TEMP_I),y                                  // 
@@ -487,13 +462,13 @@ get_status:                                       //
   jsr send_start_byte                             // the RXBUFFER now contains Configured<byte 129>Server<byte 129>SWVersion<byte 128>
                                                   // 
   lda #1                                          // set the variables up for the splitbuffer command
-  sta SLITINDEX                                   // we need the first element, so store #1 in SLITINDEX
+  sta SPLITINDEX                                   // we need the first element, so store #1 in SPLITINDEX
   jsr splitRXbuffer                               // and call spilt buffer
   lda SPLITBUFFER                                 // SPLITBUFFER NOW CONTAINS THE CONFIG_STATUS
   sta CONFIG_STATUS                               // this is only one character, store it in config_status
                                                   // 
   lda #2                                          // we need the second element out of the rxbuffer
-  sta SLITINDEX                                   // so put #2 in SLITINDEX and jump to split buffer
+  sta SPLITINDEX                                   // so put #2 in SPLITINDEX and jump to split buffer
   jsr splitRXbuffer                               // SPLITBUFFER NOW CONTAINS THE SERVERNAME
                                                   // The servername is multiple characters so we need a loop to copy it to
   ldx #0                                          // the server name variable
@@ -510,7 +485,7 @@ fin_server_name                                   //
   lda #128                                        // finish the servername variable with byte 128
   sta SERVERNAME,x                                // 
   lda #3                                          // now get the third element from the rx buffer
-  sta SLITINDEX                                   // so put #3 in SLITINDEX and jump to split buffer
+  sta SPLITINDEX                                   // so put #3 in SPLITINDEX and jump to split buffer
   jsr splitRXbuffer                               // SPLITBUFFER NOW CONTAINS THE SWVERSION
                                                   // The swversion is multiple characters so we need a loop
   ldx #0                                          // to copy the text to the SWVERSION variable
@@ -906,16 +881,16 @@ account_setup:                                    //
 acc_novice                                        // 
   lda #243                                        // ask for the mac address, registration id, nickname and regstatus
   jsr send_start_byte                             // the RXBUFFER now contains: macaddress(129)regID(129)NickName(129)regStatus(128)
-  mva #1 SLITINDEX                                // 
+  mva #1 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#5 ,#14,#0           // Display the buffers on screen (Mac address)
-  mva #2 SLITINDEX                                // 
+  mva #2 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#7 ,#18,#0           // Display the buffers on screen (registration id)
-  mva #3 SLITINDEX                                // 
+  mva #3 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#9 ,#12,#0           // Display the buffers on screen (Nick Name)
-  mva #4 SLITINDEX                                // 
+  mva #4 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   lda SPLITBUFFER                                 // 
   cmp #120                                        // 120 = x  some unknown error
@@ -1102,13 +1077,13 @@ wifi_get_cred                                     //
   displayBuffer  RXBUFFER,#22 ,#3,#1              // the RX buffer now contains the wifi status
   lda #251                                        // ask Cartridge for the wifi credentials
   jsr send_start_byte                             // the RXBUFFER now contains ssid[32]password[32]timeoffset[128]
-  mva #1 SLITINDEX                                // 
+  mva #1 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#5 ,#9,#0            // Display the buffers on screen (SSID name)
-  mva #2 SLITINDEX                                // 
+  mva #2 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#7 ,#13,#0           // Display the buffers on screen (password)
-  mva #3 SLITINDEX                                // 
+  mva #3 SPLITINDEX                                // 
   jsr splitRXbuffer                               // 
   displayBuffer  SPLITBUFFER,#9 ,#25,#0           // Display the buffers on screen (time offset)
                                                   // 
@@ -1331,7 +1306,7 @@ send_start_byte:                                  //
   sta $D502                                       // send the command byte
   ldx #0                                          // 
   lda $14                                         // 
-  sta tempt                                       // 
+  sta tempt                                       // save the status of the timer
   lda #200                                        // set a timeout
   sta $14                                         // $14 is one of the clocks
 ff_response_loop                                  // now wait for a response
@@ -1352,6 +1327,9 @@ ff_end_buffer                                     //
   sta RXBUFFER,x                                  // 
   lda tempt                                       // 
   sta $14                                         // 
+//  lda #" "
+//  ldy #0
+//  sta (SCREENMEMORYPOINTER),y
   rts                                             // 
                                                   // 
 ssb_timeout                                       // 
@@ -1363,26 +1341,31 @@ ssb_timeout                                       //
 // ----------------------------------------------------------------------
 // Wait until the cartridge is ready to receive data (RTR)
 // ----------------------------------------------------------------------
+
 wait_for_RTR:                                     // 
   pha                                             // 
 wait_for_RTR2                                     // 
   lda $D500                                       // check RTR
   and #%00000001                                  // 
   cmp #%00000001                                  // 
-  bne wait_for_RTR2                               // 
-  pla                                             // 
+  bne wait_for_RTR2                               //     
+  pla                                             //
   rts                                             // 
-                                                  // 
+                                                  //
 // ----------------------------------------------------------------------
 // Wait until the cartridge is ready to send data (RTS)
 // ----------------------------------------------------------------------
-wait_for_RTS:                                     // 
+wait_for_RTS:                                     //                                
+  pha
+wait_for_RTS2 
   lda $D501                                       // check RTS
   and #%00000010                                  // 
   cmp #%00000010                                  // 
-  bne wait_for_RTS                                // 
-  rts                                             // 
-                                                  // 
+  bne wait_for_RTS2                               // 
+  pla
+  rts                                             
+ 
+  
 // ----------------------------------------------------------------------
 // Check for messages
 // ----------------------------------------------------------------------
@@ -1559,6 +1542,7 @@ exitVersions:                                     //
 text_input:                                       // 
   mva #0 CURSORINH                                // show the cursor
 key_loop                                          // 
+  jsr blinkCursor
   jsr check_for_messages                          // 
   jsr getKey                                      // 
   cmp #255                                        // 
@@ -2100,8 +2084,8 @@ sp_read:                                          // read a byte from the index 
 sp_n:                                             // 
     lda #128                                      // 
     sta SPLITBUFFER,y                             // load 128 (the end byte) into the splitbuffer
-    dec SLITINDEX                                 // decrease $02. This address holds a number that indicates
-    lda SLITINDEX                                 // which word we need from the RXBUFFER
+    dec SPLITINDEX                                 // decrease $02. This address holds a number that indicates
+    lda SPLITINDEX                                 // which word we need from the RXBUFFER
     cmp #0                                        // so if $02 is equal to zero, we have the right word
     beq sp_exit                                   // exit in that case
     ldy #0                                        // if we need the next word
@@ -2452,7 +2436,7 @@ sm_waitrtr                                        //
   jsr beep1                                       // 
   jsr hide_cursor                                 // 
   mwa MESSAGEFIELD TEMP_I                         // 
-  dec TEMP_I                                      // 
+//  dec TEMP_I                                      // 
   ldy #0                                          // 
 sendLines                                         // 
   jsr wait_for_RTR                                // 
@@ -2492,10 +2476,7 @@ check_private:                                    //
 on_publ_screen                                    // 
   ldy #0                                          // we are on the public screen, the message should
   mwa MESSAGEFIELD TEMP_I                         // not start with @
-  lda VICEMODE                                    // 
-  cmp #1                                          // 
-  beq t11                                         // 
-  dec TEMP_I                                      // 
+//  dec TEMP_I                                      // 
 t11                                               // 
   lda (TEMP_I),y                                  // 
   cmp #32                                         // 32 is the screen code for @
@@ -2523,10 +2504,8 @@ ch_go                                             //
 on_priv_screen                                    // 
   ldy #0                                          // we are on the private screen, the message should
   mwa MESSAGEFIELD TEMP_I                         // start with @
-  lda VICEMODE                                    // 
-  cmp #1                                          // 
-  beq t12                                         // 
-  dec TEMP_I                                      // 
+ 
+//  dec TEMP_I                                      // 
 t12                                               // 
   lda (TEMP_I),y                                  // 
   cmp #32                                         // yes, it starts with @ as it should
@@ -2585,6 +2564,59 @@ fin_pmuser                                        //
   sta PMUSER,y                                    // 
 rts                                               // 
                                                   // 
+
+// ----------------------------------------------------------------------
+// procedure to blink the cursor
+// ----------------------------------------------------------------------
+blinkCursor: 
+  //rts  // <--- not in use!!
+  dec blink  
+  lda blink
+  
+  cmp #0
+  bne exit_bc
+  
+  dec blink2
+  lda blink2
+  cmp #245
+  bne exit_bc
+   
+  mva #0 blink2  
+  lda rowcrs
+  sbc #21
+  tax
+  lda startR,x
+  sta temppos
+  ldy colcrs
+   
+lq1  
+  cpy #0  
+  beq lqd
+  dey
+  inc temppos
+  jmp lq1
+lqd
+  ldy temppos
+  lda (MESSAGEFIELD),y                  ; get the character under the cursor
+  adc #127                              ; invert the char
+  sta (MESSAGEFIELD),y                  ; put it back on the screen
+  cmp #127
+  bcc setphase1  
+  lda #0
+  sta cursorphase
+  jmp exit_bc
+  
+setphase1
+  inc cursorphase
+  jmp exit_bc
+  
+  //rowcrs = $54 ; cursor row 
+  //colcrs = $55 ; cursor colm ; find out where the cursor is
+  //
+  
+exit_bc
+  rts
+                                                  
 // ----------------------------------------------------------------------
 // Calculate the addresses of where the messages will start
 // ----------------------------------------------------------------------
@@ -2619,11 +2651,11 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.79',128                          // 
-VERSION_DATE .byte '12/2024',128                  // 
+VERSION .byte '3.81',128                          // 
+VERSION_DATE .byte '01/2025',128                  // 
                                                   // 
 .local VERSION_LINE                               // 
-.byte ' Version  ROM x.xx  ESP x.xx    12/2024'   // 
+.byte ' Version  ROM x.xx  ESP x.xx    01/2025'   // 
 .endl                                             // 
                                                   // 
 NEWROM: .byte 128,128,128,128,128,128             // 
@@ -2907,6 +2939,7 @@ inhsend  .byte 0                                  //
 doswitch .byte 0                                  // 
 restoreMessageLines .byte 0                       // 
 tempt    .byte 0                                  // 
+tempt2   .byte 0
 DELAY    .byte 0,0                                // 
 ZAS      .byte 0,0                                // 
 temppos  .byte 0,0                                // 
@@ -2931,8 +2964,12 @@ STARTLINE1 .byte 0,0                              // start address when message 
 PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128// 
 RXBUFFER :150 .byte 128                           // 
 SPLITBUFFER :40 .byte 128                         // 
-                                                  // 
-                                                  // 
+RTSTO .byte 0                                     // RTS Timeout 
+RTRTO .byte 0                                     // RTR Timeout
+BLINK .byte 0
+BLINK2 .byte 0
+CURSORPHASE .byte 0
+
 // -----------------------------------
 // Print the RX Buffer on screen
 // line = 0 - 23

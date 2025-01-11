@@ -2,9 +2,9 @@
 #define COMMON_H_
 #include "Arduino.h"
 
-#define uromVersion "3.79"
-#define SwVersion "3.83"
+#define uromVersion "3.81"
+#define SwVersion "3.85"
 
-#define debug
+//#define debug
 
 #endif //COMMON_H_

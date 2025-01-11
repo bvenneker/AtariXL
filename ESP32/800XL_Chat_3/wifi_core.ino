@@ -325,12 +325,12 @@ void WifiCoreLoop(void* parameter) {
         fill_userlist();
       }
       if (refreshUserPages){
-        Serial.print("getMessage=");
-        Serial.println(getMessage);
-        Serial.print("pastMatrix=");
-        Serial.println(pastMatrix);
-        Serial.print("sendingMessage=");
-        Serial.println(sendingMessage);
+        //Serial.print("getMessage=");
+        //Serial.println(getMessage);
+        //Serial.print("pastMatrix=");
+        //Serial.println(pastMatrix);
+        //Serial.print("sendingMessage=");
+        //Serial.println(sendingMessage);
       }
       if (refreshUserPages and !getMessage and pastMatrix and !sendingMessage) {
         refreshUserPages = false;
