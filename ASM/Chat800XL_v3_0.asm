@@ -2569,7 +2569,10 @@ rts                                               //
 // procedure to blink the cursor
 // ----------------------------------------------------------------------
 blinkCursor: 
-  //rts  // <--- not in use!!
+  lda MENU_ID                                     // 
+  cmp #0                                          // 
+  bne exit_bc 
+  
   dec blink  
   lda blink
   
@@ -2651,7 +2654,7 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.81',128                          // 
+VERSION .byte '3.82',128                          // 
 VERSION_DATE .byte '01/2025',128                  // 
                                                   // 
 .local VERSION_LINE                               // 

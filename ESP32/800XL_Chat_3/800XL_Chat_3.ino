@@ -819,13 +819,13 @@ void loop() {
       case 239:
         {
           String s = newVersions;
-          if (millis() < (first_check + 10000)) s = "";
+          if (millis() < (first_check + 10000)) s = "";          
           send_String_to_Bus(s);
           if (s != "") {
             Serial.print("new version available! :");
             Serial.println(newVersions);
             delay(10);
-            urgentMessage = "New version available, press [Option]";
+            urgentMessage = "New version available, press [ESC]";
           } //else {
             //Serial.println("No update :");            
           //}
