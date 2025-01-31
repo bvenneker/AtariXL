@@ -248,7 +248,7 @@ void setup() {
   if (isWifiCoreConnected) {
     wificonnected = 1;
   }
-
+  pmCount=0;
 }  // end of setup
 
 // ******************************************************************************
@@ -774,7 +774,7 @@ void loop() {
           if (pmCount < 10) { pm = "0" + pm; }
           pm = "[PM:" + pm + "]";
           if (pmCount == 0) pm = "--";
-          //Serial.println(pm);
+          // Serial.println(pm);
           send_String_to_Bus(pm);  // then send the number of messages as a string
           break;
         }

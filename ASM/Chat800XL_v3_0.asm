@@ -1424,8 +1424,8 @@ getNumberOfPrivateMessages                        //
   mva COLCRS savecc                               // 
   mva ROWCRS savecr                               // 
   lda RXBUFFER                                    // 
-  cmp #$2d                                        // 
-  bne displayPMnumber                             // 
+  cmp #$5b                                        // 
+  beq displayPMnumber                             // 
   displayBuffer NOPMS, #20,#30,#0                 // 
   jmp check_exit0                                 // 
 displayPMnumber                                   // 
@@ -2654,7 +2654,7 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.82',128                          // 
+VERSION .byte '3.83',128                          // 
 VERSION_DATE .byte '01/2025',128                  // 
                                                   // 
 .local VERSION_LINE                               // 
