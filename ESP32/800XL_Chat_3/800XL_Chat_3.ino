@@ -1015,7 +1015,7 @@ void send_out_buffer_to_Bus() {
   // send the content of the outbuffer to the Bus
   for (int x = 0; x < outbuffersize - 1; x++) {
     delayMicroseconds(500);
-    sendByte(outbuffer[x]);
+    if (sendByte(outbuffer[x])== false) x=outbuffersize;
     lastbyte = outbuffer[x];
   }
   // all done, send end byte if not send yet
@@ -1089,7 +1089,8 @@ void receive_buffer_from_Bus(int cnt) {
 // ******************************************************************************
 // send a single byte to the Bus
 // ******************************************************************************
-void sendByte(byte b) {
+bool sendByte(byte b) {
+  bool result=true;
   outByte(b);
   io2 = false;
   ready_to_send(true);
@@ -1101,10 +1102,12 @@ void sendByte(byte b) {
       io2 = true;
       Serial.print("Timeout in sendByte: ");
       Serial.println(b);
+      result=false;
     }
   }
   ready_to_send(false);
   io2 = false;
+  return result;
 }
 
 

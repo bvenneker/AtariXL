@@ -576,7 +576,8 @@ skip_mm1                                          //
   displayText VERSION_LINE, #23,#0                // draw the version line
   displayBuffer SWVERSION,#23,#24,#0              // 
   displayBuffer VERSION,#23,#14,#0                // 
-                                                  // 
+  displayBuffer VERSION_DATE #23,#32,#0            // 
+  
 main_menu_key_input:                              // 
   jsr getKey                                      // 
   cmp #255                                        // 
@@ -1423,12 +1424,14 @@ getNumberOfPrivateMessages                        //
   jsr send_start_byte                             // 
   mva COLCRS savecc                               // 
   mva ROWCRS savecr                               // 
+  lda #8                                          // set a length limit for the pm count
+  sta LENLIMIT                                    //
   lda RXBUFFER                                    // 
-  cmp #$5b                                        // 
-  beq displayPMnumber                             // 
+  cmp #$5b                                        // compare, see if first character is [ 
+  beq displayPMnumber                             // if not, show the normal divider line
   displayBuffer NOPMS, #20,#30,#0                 // 
   jmp check_exit0                                 // 
-displayPMnumber                                   // 
+displayPMnumber                                   // display number of private messages
   displayBuffer RXBUFFER, #20,#30,#0              // 
 check_exit0                                       // 
   mva savecc COLCRS                               // 
@@ -1437,7 +1440,6 @@ check_exit0                                       //
 check_exit                                        // 
   rts                                             // 
                                                   // 
-//LINEC .byte 0
 savex .byte 0                                     // 
 savecr .byte 0                                    // 
 savecc .byte 0                                    // 
@@ -2345,6 +2347,8 @@ displayBufferk:                                   //
   mva #1 CURSORINH                                // 
 db_next_char                                      // 
   ldy CHARINDEX                                   // 
+  cpy LENLIMIT                                    //
+  bcs db_exit                                     //
   lda (TEXTPOINTER),y                             //   
   cmp #128                                        // 
   beq db_exit                                     // 
@@ -2353,6 +2357,8 @@ write_it                                          //
   inc CHARINDEX                                   // 
   jmp db_next_char                                // 
 db_exit                                           // 
+  lda #255                                        //
+  sta LENLIMIT                                    //
   rts                                             // 
                                                   // 
 // ----------------------------------------------------------------------
@@ -2654,12 +2660,10 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.83',128                          // 
-VERSION_DATE .byte '01/2025',128                  // 
+VERSION .byte '3.85',128                          // 
+VERSION_DATE .byte '02/2025',128                  // 
                                                   // 
-.local VERSION_LINE                               // 
-.byte ' Version  ROM x.xx  ESP x.xx    01/2025'   // 
-.endl                                             // 
+                                                  // 
                                                   // 
 NEWROM: .byte 128,128,128,128,128,128             // 
 NEWESP: .byte 128,128,128,128,128,128             // 
@@ -2731,6 +2735,11 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
            :32 .byte $12                          // 
            .byte 3,$9b,$1f,$1f,$1f,$1c,$1c        // 
            .byte 128                              // 
+                                                  //
+  .local VERSION_LINE                             // 
+  .byte ' Version  ROM x.xx  ESP x.xx    xx/xxxx' // 
+  .endl                                           //
+                                                  //
   .local UPDATEDONE                               // 
   .byte 'Update complete!'                        // 
   .endl                                           // 
@@ -2972,7 +2981,7 @@ RTRTO .byte 0                                     // RTR Timeout
 BLINK .byte 0
 BLINK2 .byte 0
 CURSORPHASE .byte 0
-
+LENLIMIT .byte 0
 // -----------------------------------
 // Print the RX Buffer on screen
 // line = 0 - 23
