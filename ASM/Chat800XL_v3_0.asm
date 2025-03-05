@@ -1198,12 +1198,13 @@ exit_wait                                         //
 // ---------------------------------------------------------------------
 // read a field and send it to the cartridge
 // input row and column in TEMP_I and TEMP_I+1
+// set length of textbox in TEXTBOXLEN
 // ---------------------------------------------------------------------
-read_field:                                       // 
-  lda SCREENMEMORYPOINTER                         // reset the input field pointer
-  sta TEXTBOX                                     // reset the input field pointer
-  lda SCREENMEMORYPOINTER+1                       // reset the input field pointer
-  sta TEXTBOX+1                                   // reset the input field pointer
+read_field:                                       //
+  lda SCREENMEMORYPOINTER                         // 
+  sta TEXTBOX                                     // 
+  lda SCREENMEMORYPOINTER+1                       // 
+  sta TEXTBOX+1                                   //
   jsr open_field                                  // get a pointer to the start adres of the field
   ldy #0                                          // 
 loopr                                             // 
@@ -1429,7 +1430,8 @@ getNumberOfPrivateMessages                        //
   lda RXBUFFER                                    // 
   cmp #$5b                                        // compare, see if first character is [ 
   beq displayPMnumber                             // if not, show the normal divider line
-  displayBuffer NOPMS, #20,#30,#0                 // 
+  //displayBuffer NOPMS, #20,#30,#0                 // 
+  displayText DIVIDER_LINE, #20,#0
   jmp check_exit0                                 // 
 displayPMnumber                                   // display number of private messages
   displayBuffer RXBUFFER, #20,#30,#0              // 
