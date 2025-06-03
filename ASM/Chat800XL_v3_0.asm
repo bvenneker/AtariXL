@@ -576,7 +576,7 @@ skip_mm1                                          //
   displayText VERSION_LINE, #23,#0                // draw the version line
   displayBuffer SWVERSION,#23,#24,#0              // 
   displayBuffer VERSION,#23,#14,#0                // 
-  displayBuffer VERSION_DATE #23,#32,#0            // 
+  displayBuffer VERSION_DATE #23,#32,#0           // 
   
 main_menu_key_input:                              // 
   jsr getKey                                      // 
@@ -592,11 +592,11 @@ main_menu_key_input:                              //
 cp_2                                              // 
   cmp #$32                                        // key 2 is pressed (server setup)
   bne cp_3                                        // 
-  jmp server_setup                                // 
+  jmp account_setup                               // 
 cp_3                                              // 
   cmp #$33                                        // key 3 is pressed (account)
   bne cp_4                                        // 
-  jmp account_setup                               // 
+  jmp server_setup                                // 
 cp_4                                              // 
   cmp #$34                                        // key 4 is pressed (user list)
   bne cp_5                                        // 
@@ -2663,7 +2663,7 @@ calculate_screen_addresses:                       //
 // Constants
 // ----------------------------------------------------------------
 VERSION .byte '3.85',128                          // 
-VERSION_DATE .byte '02/2025',128                  // 
+VERSION_DATE .byte '05/2025',128                  // 
                                                   // 
                                                   // 
                                                   // 
@@ -2739,7 +2739,7 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
            .byte 128                              // 
                                                   //
   .local VERSION_LINE                             // 
-  .byte ' Version  ROM x.xx  ESP x.xx    xx/xxxx' // 
+  .byte ' Version  ROM x.xx  ESP x.xx           ' // 
   .endl                                           //
                                                   //
   .local UPDATEDONE                               // 
@@ -2840,10 +2840,10 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .byte '[1] Wifi Setup'                          // 
   .endl                                           // 
   .local MLINE_MAIN2                              // 
-  .byte '[2] Server Setup'                        // 
+  .byte '[2] Account Setup'                       // 
   .endl                                           // 
   .local MLINE_MAIN3                              // 
-  .byte '[3] Account Setup'                       // 
+  .byte '[3] Server Setup'                        // 
   .endl                                           // 
   .local MLINE_MAIN4                              // 
   .byte '[4] List Users'                          // 

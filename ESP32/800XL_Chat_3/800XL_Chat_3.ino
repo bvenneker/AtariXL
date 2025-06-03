@@ -201,7 +201,8 @@ void setup() {
 
   // get Chatserver ip/fqdn from eeprom
   server = settings.getString("server", "www.chat64.nl");
-
+  if (server=="empty") server="www.chat64.nl";
+  
   ssid = settings.getString("ssid", "empty");  // get WiFi credentials and Chatserver ip/fqdn from eeprom
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
@@ -726,7 +727,7 @@ void loop() {
             settings.putString("myNickName", "empty");
             settings.putString("ssid", "empty");
             settings.putString("password", "empty");
-            settings.putString("server", "empty");
+            settings.putString("server", "www.chat64.nl");
             settings.putString("configured", "empty");
             settings.putString("timeoffset", "+0");
             settings.putUInt("scrcolor", 0);
@@ -748,7 +749,7 @@ void loop() {
           regStatus = responseMessage.response.str[0];
 
           send_String_to_Bus(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus + char(128));
-          if (regStatus == 'r' and configured == "s") {
+          if (regStatus == 'r' and configured == "w") {
             configured = "d";
             settings.begin("mysettings", false);
             settings.putString("configured", "d");
