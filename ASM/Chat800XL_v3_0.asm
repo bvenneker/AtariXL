@@ -157,13 +157,12 @@ chat_screen                                       //
   lda VICEMODE                                    // 
   cmp #1                                          // 
   bne mc_not_vice                                 // 
-  lda #4                                          // 
+  lda #148                                        // 
   sta COLOR4                                      // 
   sta COLOR2                                      // 
   jsr error_sound                                 // 
-                                                  // 
+   
   displayText TEXT_NO_CARTRIDGE, #5,#6            // 
-                                                  // 
                                                   // 
 mc_not_vice                                       // 
                                                   // 
@@ -2663,7 +2662,7 @@ calculate_screen_addresses:                       //
 // Constants
 // ----------------------------------------------------------------
 VERSION .byte '3.85',128                          // 
-VERSION_DATE .byte '05/2025',128                  // 
+VERSION_DATE .byte '07/2025',128                  // 
                                                   // 
                                                   // 
                                                   // 
@@ -2884,7 +2883,11 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .byte 'Hardware, software and manuals are available on Github',$9B,$9B// 
   .byte 'github.com/bvenneker/Chat64-Atari800'    // 
   .endl                                           // 
-                                                  // 
+
+
+   
+  
+  
   .local TEXT_MADE_BY                             // 
   .byte 'Made by Bart and Theo in 2024'           // 
   .endl                                           // 
@@ -2937,11 +2940,11 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
                                                   // 
   .endl                                           // 
   .local TEXT_NEW_ROM                             // 
-  .byte 'New ROM: '                               // 
+  .byte 'New ROM: 3.87'                           // 
   .endl                                           // 
                                                   // 
   .local TEXT_NEW_ESP                             // 
-  .byte 'New ESP: '                               // 
+  .byte 'New ESP: 3.50'                           // 
   .endl                                           // 
                                                   // 
                                                   // 
@@ -2963,7 +2966,7 @@ FIELD_MAX .byte 0                                 //
 FIELD_MIN .byte 0                                 // 
 VICEMODE .byte 0                                  // 
 CONFIG_STATUS .byte 0,128                         // 
-SWVERSION .byte '9.99',128                        // 
+SWVERSION .byte '3.85    07/2025',128                        // 
 SERVERNAME .byte 'www.chat64.nl          ',128    // 
 TEMPBYTE .byte 0                                  // 
 WIFISTATUS .byte 0                                // 

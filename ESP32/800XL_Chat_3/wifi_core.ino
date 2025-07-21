@@ -388,6 +388,8 @@ void WifiCoreLoop(void* parameter) {
     httpb.end();
     client.stop();  // without this, we have a small memory leak
     newVersions = UpdateAvailable();
+    Serial.print(">>>>>> ");
+    Serial.println(newVersions);
   }
 }
 
@@ -402,6 +404,7 @@ void softReset() {
 }
 
 String UpdateAvailable(){
+  Serial.println("--- CHECK UPDATES -----");
   String serverName = "http://" + server + "/checkUpdateForAtari.php";
   WiFiClient client;
   HTTPClient http;
@@ -412,12 +415,10 @@ String UpdateAvailable(){
   String result = "0";
   result = http.getString();
   result.trim();
-  
   http.end();
   client.stop();
   String thisVersion = String(uromVersion) + " " + String(SwVersion);
-  
-  if (result != thisVersion) {    
+  if (result != thisVersion) {   
     return result;
   }
   return "";

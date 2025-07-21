@@ -37,7 +37,7 @@ int userpageCount = 0;
 char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
-int screenColor = 0;
+int screenColor = 148;
 unsigned long hangup =0;
 int lastCommand =0;
 WiFiCommandMessage commandMessage;
@@ -207,8 +207,8 @@ void setup() {
   password = settings.getString("password", "empty");
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
 
-  screenColor = settings.getUInt("scrcolor", 0);
-  
+  screenColor = settings.getUInt("scrcolor", 148);
+  //screenColor=148;
   settings.end();
 
 
@@ -730,7 +730,7 @@ void loop() {
             settings.putString("server", "www.chat64.nl");
             settings.putString("configured", "empty");
             settings.putString("timeoffset", "+0");
-            settings.putUInt("scrcolor", 0);
+            settings.putUInt("scrcolor", 148);
             settings.end();
             // now reset the esp
             reboot();
@@ -819,17 +819,14 @@ void loop() {
         }
       case 239:
         {
-          String s = newVersions;
-          if (millis() < (first_check + 10000)) s = "";          
-          send_String_to_Bus(s);
-          if (s != "") {
+          if (millis() < (first_check + 10000)) break;          
+          send_String_to_Bus(newVersions);
+          if (newVersions != "") {
             Serial.print("new version available! :");
             Serial.println(newVersions);
             delay(10);
             urgentMessage = "New version available, press [ESC]";
-          } //else {
-            //Serial.println("No update :");            
-          //}
+          } 
           break;
         }
       case 238:

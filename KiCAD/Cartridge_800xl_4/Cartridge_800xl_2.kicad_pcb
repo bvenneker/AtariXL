@@ -654,7 +654,7 @@
 	(footprint "Barts:Atari_bus"
 		(layer "F.Cu")
 		(uuid "2f3deced-880d-4075-a81b-95c62da5b94d")
-		(at 133.7745 136.358)
+		(at 133.671352 138.782)
 		(property "Reference" "Z1"
 			(at 0 5.08 180)
 			(layer "F.SilkS")
@@ -6450,8 +6450,8 @@
 		(uuid "49f7ec63-a0e5-4721-9f77-7e32a9c80487")
 	)
 	(gr_line
-		(start 132.245148 140.3875)
-		(end 132.245148 123.7625)
+		(start 131.953 142.8115)
+		(end 131.953 123.7615)
 		(stroke
 			(width 0.1)
 			(type solid)
@@ -6460,8 +6460,18 @@
 		(uuid "53a7e01b-3c9b-4774-b0e1-f33d28862731")
 	)
 	(gr_line
+		(start 171.0055 142.8115)
+		(end 171.0055 123.8125)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+		(uuid "59244664-369b-4a1c-a06a-f92d359722fe")
+	)
+	(gr_line
 		(start 119.695148 123.7625)
-		(end 132.245148 123.7625)
+		(end 131.953 123.7615)
 		(stroke
 			(width 0.1)
 			(type solid)
@@ -6491,7 +6501,7 @@
 	)
 	(gr_line
 		(start 183.670148 123.7875)
-		(end 171.055148 123.8125)
+		(end 171.0055 123.8125)
 		(stroke
 			(width 0.1)
 			(type solid)
@@ -6500,18 +6510,8 @@
 		(uuid "baa0091e-5d25-4977-893f-4d9c98f8baa4")
 	)
 	(gr_line
-		(start 171.045148 140.3875)
-		(end 171.055148 123.8125)
-		(stroke
-			(width 0.1)
-			(type solid)
-		)
-		(layer "Edge.Cuts")
-		(uuid "d772a577-a1d6-4254-a2c8-ccc79c4a513a")
-	)
-	(gr_line
-		(start 171.045148 140.3875)
-		(end 132.245148 140.3875)
+		(start 171.0055 142.8115)
+		(end 131.953 142.8115)
 		(stroke
 			(width 0.1)
 			(type solid)
@@ -6924,7 +6924,7 @@
 		(layer "User.1")
 		(uuid "0c361978-abaf-429b-9341-4f023adf383a")
 		(pts
-			(xy 183.570148 60.2125) (xy 183.645148 140.4625)
+			(xy 183.570148 60.2125) (xy 183.5785 142.8115)
 		)
 		(height -13.374858)
 		(format
@@ -6943,8 +6943,8 @@
 			(extension_offset 0.5)
 			(keep_text_aligned yes)
 		)
-		(gr_text "80.2500 mm"
-			(at 198.132499 100.323925 270.0535474)
+		(gr_text "82.5990 mm"
+			(at 198.099182 101.510532 270.0057935)
 			(layer "User.1")
 			(uuid "0c361978-abaf-429b-9341-4f023adf383a")
 			(effects
@@ -7032,7 +7032,7 @@
 		(layer "User.1")
 		(uuid "fa1b07bb-2445-4190-872f-94ba80377f60")
 		(pts
-			(xy 132.245148 140.3875) (xy 171.045148 140.3875)
+			(xy 131.953 142.8115) (xy 171.0055 142.8115)
 		)
 		(height 4.45)
 		(format
@@ -7051,8 +7051,8 @@
 			(extension_offset 0.5)
 			(keep_text_aligned yes)
 		)
-		(gr_text "38.8000 mm"
-			(at 151.645148 143.6875 0)
+		(gr_text "39.0525 mm"
+			(at 151.47925 146.1115 0)
 			(layer "User.1")
 			(uuid "fa1b07bb-2445-4190-872f-94ba80377f60")
 			(effects
