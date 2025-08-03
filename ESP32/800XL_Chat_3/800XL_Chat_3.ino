@@ -534,8 +534,7 @@ void loop() {
           settings.putString("password", password);
           settings.putString("timeoffset", timeoffset);
           settings.end();
-          commandMessage.command = WiFiBeginCommand;
-          xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
+          softReset();
           break;
         }
 
@@ -1299,3 +1298,4 @@ void myShiftOut(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrder, uint8_t val
     digitalWrite(clockPin, LOW);
   }
 }
+
