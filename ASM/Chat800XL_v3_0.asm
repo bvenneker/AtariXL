@@ -38,7 +38,6 @@ COLCRS = $55                                      // cursor colm
 MESSAGEFIELD = $43                                // 43 and 44 hold a pointer to the main input field 
 SPLITINDEX = $46                                  // 
                                                   // 
-                                                  // 
 CURSORINH = $2F0                                  // cursor inhibit, cursor is invisible if value is not zero
 SCREENMEMORYPOINTER = $58                         // zero page pointer to screen memory
                                                   // 
@@ -59,6 +58,8 @@ init                                              //
   sta CHARINDEX                                   // 
   sta inhsend                                     // 
   sta doswitch                                    // 
+  sta FIRSTDOWN                                   //
+  sta SCROLLMODE                                  //
   sta restoreMessageLines                         // 
   sta MENU_ID                                     // 
   sta SCREEN_ID                                   // 
@@ -66,8 +67,39 @@ init                                              //
   sta TEXTBOX                                     // 
   lda SCREENMEMORYPOINTER+1                       // 
   sta TEXTBOX+1                                   // 
-                                                  // 
-                                                  // 
+  lda #170                                        //
+  sta TIMEOUTVALUE                                //
+                                                  //
+create_screen_lines_lookup_table:                 // 
+  lda SCREENMEMORYPOINTER                         //  
+  sta TEMP_I                                      //
+  sta screenLinesLow                              //
+  lda SCREENMEMORYPOINTER +1                      //
+  sta TEMP_I +1                                   //
+  sta screenLinesHigh                             //
+  ldx #1                                          //
+sl_copy_loop                                      //
+  clc                                             //
+  lda TEMP_I                                      //
+  adc #40                                         //
+  sta screenLinesLow,x                            //
+  sta TEMP_I                                      //
+  bcs up_slh                                      //
+  lda TEMP_I +1                                   //
+  sta screenLinesHigh,x                           //
+  sta TEMP_I+1                                    //
+  jmp cnt_sl                                      //
+up_slh                                            //
+  ldy TEMP_I +1                                   //
+  iny                                             //
+  tya                                             //
+  sta screenLinesHigh,x                           //
+  sty TEMP_I +1                                   //
+cnt_sl                                            //
+  inx                                             //
+  cpx #22                                         //
+  bne sl_copy_loop                                //
+                                                  //
 main                                              // 
   jsr are_we_in_the_matrix                        // 
   jsr startScreen                                 // 
@@ -156,14 +188,20 @@ chat_screen                                       //
                                                   // 
   lda VICEMODE                                    // 
   cmp #1                                          // 
-  bne mc_not_vice                                 // 
+  beq mc_vice                                     // 
+  jmp mc_not_vice
+mc_vice
   lda #148                                        // 
   sta COLOR4                                      // 
   sta COLOR2                                      // 
   jsr error_sound                                 // 
    
   displayText TEXT_NO_CARTRIDGE, #5,#6            // 
-                                                  // 
+  //displayText FakeChat, #0,#0                                                
+  //displayText FakeChat2,#5,#0  // 
+  //displayText FakeChat3,#12,#0  // 
+  //displayText FakeChat4,#18,#0  // 
+  
 mc_not_vice                                       // 
                                                   // 
   mva #255 $2fc                                   // clear keyboard buffer
@@ -180,6 +218,47 @@ chat_key_input                                    //
                                                   // 
                                                   // 
                                                   // 
+// ----------------------------------------------------------------------
+// shift public screen down for scrolling
+// ----------------------------------------------------------------------
+shift_screen_down:  
+  ldx #18
+all_lines
+  lda screenLinesLow,x
+  sta TEMP_I
+  lda screenLinesHigh,x
+  sta TEMP_I + 1
+  inx 
+  lda screenLinesLow,x
+  sta TEMP_O
+  lda screenLinesHigh,x
+  dex
+  sta TEMP_O + 1
+  ldy #39
+clloop  
+  lda (TEMP_I),y
+  sta (TEMP_O),y
+  dey
+  cpy #255
+  bne clloop  
+  dex
+  cpx #255
+  bne all_lines
+  // clear line zero
+  lda screenLinesLow
+  sta TEMP_I
+  lda screenLinesHigh
+  sta TEMP_I + 1
+  ldy #39
+  lda #0
+clearlp
+  sta (TEMP_I),y
+  dey
+  cpy #255
+  bne clearlp 
+  rts
+  //   
+
 // ----------------------------------------------------------------------
 // shift screen up
 // ----------------------------------------------------------------------
@@ -212,7 +291,7 @@ shift_loop                                        //
 up_hb                                             // 
   inc TEMP_O+1                                    // increase highbyte
 sh_up_d                                           // 
-  jsr shift_line                                  // 
+  jsr shift_line_up                               // 
   mwa TEMP_O TEMP_I                               // 
   dex                                             // 
   bne shift_loop                                  // 
@@ -222,12 +301,10 @@ sh_up_d                                           //
 line_clear_loop                                   // 
   sta (TEMP_I),y                                  // 
   dey                                             // 
-  bne line_clear_loop                             // 
-                                                  // 
+  bne line_clear_loop                             //  
   rts                                             // 
                                                   // 
-                                                  // 
-shift_line:                                       // this routine shifts one line up
+shift_line_up:                                    // this routine shifts one line up
   ldy #0                                          // TEMP_O is source
 shift_line_loop                                   // TEMP_I is destination
   lda (TEMP_O),y                                  // 
@@ -341,7 +418,6 @@ do_m_restore                                      //
   jsr restore_the_screen                          // 
   mva MCURSORX COLCRS                             // restore the cursor position
   mva MCURSORY ROWCRS                             // restore the cursor position
-                                                  // 
   jmp chat_key_input                              // 
                                                   // 
 restore_the_screen                                // 
@@ -840,7 +916,7 @@ ul_vice                                           //
 ul_get_key_input                                  // 
   jsr getKey                                      // 
                                                   // cmp #$37
-  cmp #251                                        // OPTION key is pressed
+  cmp #251                                        // ESC key is pressed
   beq ul_exit_main_menu                           // 
   cmp #$6E                                        // key 'n' is pressed
   beq ul_next                                     // 
@@ -1219,14 +1295,13 @@ loopr_exit                                        //
   lda #128                                        // to close the transmission with byte 128
   sta $D502                                       // send 128 to the cartridge
   rts                                             // return
-                                                  // 
 // ---------------------------------------------------------------------
 // Open a field to read                  
 // input row and column in TEMP_I and TEMP_I+1               
 // this procedure creates a pointer to the field in TEXTBOX (2 bytes)               //
 // ---------------------------------------------------------------------
 open_field:                                       // 
-  ldx TEMP_I                                      // get the row (TEMP_I holds the rown number)
+  ldx TEMP_I                                      // get the row (TEMP_I holds the row number)
 sm_lineadd                                        // SCREENMEMORYPOINTER is the start of screen memory
   clc                                             // clear carry
   lda TEXTBOX                                     // start at the start of screen memory
@@ -1545,12 +1620,34 @@ exitVersions:                                     //
 text_input:                                       // 
   mva #0 CURSORINH                                // show the cursor
 key_loop                                          // 
-  jsr blinkCursor
+  jsr blinkCursor                                 //
   jsr check_for_messages                          // 
+klgk
   jsr getKey                                      // 
   cmp #255                                        // 
   beq key_loop                                    // 
                                                   // 
+cpoption                                          // 
+  cmp #251                                        // ESC is pressed
+  bne cp_scroll_up                                // 
+  jsr handle_escape                               //
+cp_scroll_up                                      // 
+  cmp #139                                        // Control + u = scroll up 
+  bne cp_scroll_down                              //
+  jsr scroll_up                                   //
+  jmp key_loop                                    //
+cp_scroll_down                                    //
+  cmp #186                                        // Control + d = scroll down  
+  bne cpshortloop                                 //
+  jsr scroll_down                                 //
+  jmp key_loop                                    //
+cpshortloop
+  tax // save the accumulator (the keystroke)
+  lda SCROLLMODE
+  cmp #1
+  beq klgk
+  txa // restore the accumulator
+                                                  //
 cpClear                                           // 
   cmp #1                                          // 
   bne cpselect                                    // 
@@ -1561,7 +1658,7 @@ cpClear                                           //
                                                   // 
 cpselect                                          // 
   cmp #252                                        // 
-  bne cpoption                                    // 
+  bne cpstart                                     // 
   lda MENU_ID                                     // 
   cmp #13                                         // 
   beq jmp_reset_screen                            // 
@@ -1572,14 +1669,7 @@ cpselect                                          //
                                                   // 
 jmp_reset_screen                                  // 
   jmp reset_screen                                // 
-                                                  // 
-cpoption                                          // 
-  cmp #251                                        // 
-  bne cpstart                                     // 
-  mva #255 $2fc                                   // clear keyboard buffer
-  jsr backup_screen                               // 
-  jmp main_menu                                   // 
-                                                  // 
+                                                  //
 cpstart                                           // 
   cmp #253                                        // 
   bne cpdelete                                    // 
@@ -1603,7 +1693,8 @@ cpstart_exit                                      //
                                                   // 
 cpdelete                                          // 
   cmp #8                                          // delete key is pressed
-  beq handle_delete                               // 
+  bne cpreturn
+  jmp handle_delete                               // 
                                                   // 
 cpreturn                                          // 
   cmp #13                                         // 
@@ -1662,6 +1753,22 @@ in_field                                          //
   jsr write_text                                  // 
   jmp out_exit                                    // 
                                                   // 
+handle_escape:
+  mva #255 $2fc                                   // clear keyboard buffer  
+  lda SCROLLMODE
+  cmp #0
+  beq esc_1
+  lda #0
+  sta SCROLLMODE
+  mva #0 MCURSORX                                 // restore the cursor position
+  mva #21 MCURSORY                                // restore the cursor position
+  jmp restore_screen
+  
+  
+esc_1
+  jsr backup_screen                               // 
+  jmp main_menu                                   // 
+
 handle_delete                                     // 
                                                   // 
   lda MENU_ID                                     // 
@@ -1780,6 +1887,43 @@ hr_ng                                             //
   mva #255 $2fc                                   // clear keyboard buffer
   jmp key_loop                                    // 
                                                   // 
+// ----------------------------------------------------------------------                                                  
+// Scroll up and down reoutines.
+// ----------------------------------------------------------------------                                                  
+setUpScrollMode:
+  lda SCROLLMODE
+  cmp #1
+  beq su_scr1 
+  jsr backup_screen
+  displayText text_scrolling_mode, #21,#0  
+su_scr1:
+  lda #1
+  sta SCROLLMODE
+  lda #255
+  sta TIMEOUTVALUE
+  rts
+// ----------------------------------------------------------------------                                                  
+scroll_up:
+  jmp exit_sd
+  lda SCREEN_ID
+  cmp #3
+  bne cont_scroll_up
+  jmp exit_su
+cont_scroll_up
+  jsr setUpScrollMode
+  jsr shift_screen_down
+  jsr sound_zipp
+exit_su:  
+  mva #255 $2fc                                   // clear keyboard buffer
+  rts
+// ----------------------------------------------------------------------
+scroll_down:
+
+exit_sd:
+  mva #255 $2fc                                   // clear keyboard buffer
+  rts
+// ----------------------------------------------------------------------
+                                                  
 // ----------------------------------------------------------------------
 // procedure for sound
 // ----------------------------------------------------------------------
@@ -1991,11 +2135,11 @@ kb2asci:                                          //
 //          91  92  93  94  95  96 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 
   .byte     '&',251,'%','"','!','[',33,']','N',100,'M','?',' ','R',105,'E','Y',' ','T','W','Q','(',113,')','''',8,'@',1,'>','F'// 
 //          121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150  
-  .byte     'H','D',123,' ','G','S','A','L','J',';','3',  4,'K',134,135,'O',137,'P','U',253,'I',142,143,'V', 17,'C', 19, 20,'B','X'// 
+  .byte     'H','D',123,' ','G','S','A','L','J',';','3',  4,'K',134,135,'O',137,'P',139,253,'I',142,143,'V', 17,'C', 19, 20,'B','X'// 
 //          151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180
   .byte     'Z','$',153,'#','&',251,'%','"',255,'[',161,']','N',164,'M','?',' ','R',169,'E','Y',' ','T','W','Q','(',177,')','''',8// 
 //          181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210
-  .byte     '@',1,'>','F','H','D',187,' ','G','S','A','L','J',';',195,196,197,198,199,'O',201,'P','U',253,'I','_','|','V',209,210// 
+  .byte     '@' ,1  ,'>','F','H',186,187,' ','G','S','A','L','J',';',195,196,197,198,199,'O',201,'P','U',253,'I','_','|','V',209,210// 
 //          211 212 213 214 215 216 217 218 219 220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240
   .byte     211,212,213,214,215,'$',217,'#','&',251,'%','"','!','[',225,']','N',228,'M','?',' ','R',233,'E','Y',' ','T','W','Q','('// 
 //          241 242 243 244 245 246 247 248 249 250 251 252 253 254 255
@@ -2276,7 +2420,7 @@ playTone_startup:                                 //
   rts                                             // 
                                                   // 
 //=========================================================================================================
-//  SUB ROUTINE TO SHIFT THE COLORS IN THE STAR LINES TO LEFT
+//  SUB ROUTINE TO SHIFT THE STAR LINES TO LEFT
 //=========================================================================================================
 shift_line_to_left:                               // a pointer to the screen memory address where the line we want to shift starts
                                                   // is stored in zero page address TEMP_I, TEMP_I+1
@@ -2442,8 +2586,7 @@ sm_waitrtr                                        //
                                                   // 
   jsr beep1                                       // 
   jsr hide_cursor                                 // 
-  mwa MESSAGEFIELD TEMP_I                         // 
-//  dec TEMP_I                                      // 
+  mwa MESSAGEFIELD TEMP_I                         //  
   ldy #0                                          // 
 sendLines                                         // 
   jsr wait_for_RTR                                // 
@@ -2483,7 +2626,6 @@ check_private:                                    //
 on_publ_screen                                    // 
   ldy #0                                          // we are on the public screen, the message should
   mwa MESSAGEFIELD TEMP_I                         // not start with @
-//  dec TEMP_I                                      // 
 t11                                               // 
   lda (TEMP_I),y                                  // 
   cmp #32                                         // 32 is the screen code for @
@@ -2569,7 +2711,7 @@ fin_pmuser                                        //
   iny                                             // 
   lda #128                                        // 
   sta PMUSER,y                                    // 
-rts                                               // 
+  rts                                               // 
                                                   // 
 
 // ----------------------------------------------------------------------
@@ -2579,7 +2721,12 @@ blinkCursor:
   lda MENU_ID                                     // 
   cmp #0                                          // 
   bne exit_bc 
-  
+
+  lda SCROLLMODE  
+  cmp #1
+  bne dblnk
+  rts
+dblnk  
   dec blink  
   lda blink
   
@@ -2884,10 +3031,12 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .byte 'github.com/bvenneker/Chat64-Atari800'    // 
   .endl                                           // 
 
+  .local text_scrolling_mode                     
+  .byte 'Scrolling Mode       [ ESC ] = Live Chat'
+  .byte 'Control + u = up',$9B
+  .byte 'Control + d = down'
+  .endl
 
-   
-  
-  
   .local TEXT_MADE_BY                             // 
   .byte 'Made by Bart and Theo in 2024'           // 
   .endl                                           // 
@@ -2948,7 +3097,31 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
                                                   // 
-                                                  // 
+  .local FakeChat                                 // 
+  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,180,181,186,179,183,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//                                                
+  .byte 'and how did you solve that?',$9b
+  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//  
+  .byte 'what was repaired?',$9b
+  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
+  .endl
+  .local FakeChat2
+  .byte 'The OSC additions I am making needs to add UDP protocol to the WiFi module, somehow that broke the whole unit sequence  '
+  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,177,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
+  .byte 'but its all better now',$9b
+  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,180,186,178,179,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
+  .byte 'ah... in case we need to repair',$9b
+  .endl                                           //                                                
+  .local FakeChat3
+  .byte 'ours too',$9B
+  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,176,185,186,176,177,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
+  .byte 'Hi Theo, all okay?',$9B
+  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,177,186,179,185,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
+  .byte 'Yes, I am a happy camper! my code is coming along nice',$9b
+  .endl
+  .local FakeChat4
+  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,178,186,177,183,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
+  .byte 'Oh, that was for Theo..... xD',$9b
+  .endl
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------
@@ -2987,6 +3160,12 @@ BLINK .byte 0
 BLINK2 .byte 0
 CURSORPHASE .byte 0
 LENLIMIT .byte 0
+SCROLLMODE .byte 0
+FIRSTDOWN .byte 0
+TIMEOUTVALUE .byte 0
+TEMPLINE .byte '123                                     ',128
+screenLinesLow .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0                                                  
+screenLinesHigh .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 
 // -----------------------------------
 // Print the RX Buffer on screen
 // line = 0 - 23

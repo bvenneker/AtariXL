@@ -5,3 +5,4 @@ ESP32/800XL_Chat_3_77/.theia/launch.json
 /ESP32/800XL_Chat_3/build
 ASM/new.asm
 ASM/comment.py
+ASM/.atari800.cfg
