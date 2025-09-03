@@ -16,14 +16,12 @@ Preferences settings;
 // ********************************
 // **     Global Variables       **
 // ********************************
-String configured = "empty";  // do not change this!
-
 String urgentMessage = "";
 int wificonnected = -1;
 char regStatus = 'u';
-volatile bool dataFromBus = false;
+volatile bool dataFromHost = false;
 volatile bool io2 = false;
-char inbuffer[250];  // a character buffer for incomming data
+char inbuffer[250];  // a character buffer for incoming data
 int inbuffersize = 0;
 char outbuffer[250];  // a character buffer for outgoing data
 int outbuffersize = 0;
@@ -42,7 +40,10 @@ unsigned long hangup =0;
 int lastCommand =0;
 WiFiCommandMessage commandMessage;
 WiFiResponseMessage responseMessage;
-
+bool waitAck = false;
+int scrollBufferIndex = 0;
+int publicBufferIndex = 0;
+int privateBufferIndex =0;
 // ********************************
 // **        OUTPUTS             **
 // ********************************
@@ -62,9 +63,9 @@ WiFiResponseMessage responseMessage;
 // **        INPUTS             **
 // ********************************
 #define resetSwitch GPIO_NUM_26
-#define BusIO1 GPIO_NUM_22
+#define HostIO1 GPIO_NUM_22
 #define sdata GPIO_NUM_34
-#define BusIO2 GPIO_NUM_13
+#define HostIO2 GPIO_NUM_13
 
 // *************************************************
 // Interrupt routine for IO1
@@ -74,7 +75,7 @@ void IRAM_ATTR isr_io1() {
   ready_to_receive(false);
   ch = 0;
   ch = shiftIn(sdata, sclk1, MSBFIRST);
-  dataFromBus = true;
+  dataFromHost = true;
 }
 
 // *************************************************
@@ -107,7 +108,7 @@ void reboot() {
 void create_Task_WifiCore() {
   // we create a task for the second (unused) core of the esp32
   // this task will communicate with the web site while the other core
-  // is busy talking to the Bus
+  // is busy talking to the Host
   xTaskCreatePinnedToCore(
     WifiCoreLoop, /* Function to implement the task */
     "Task1",      /* Name of the task */
@@ -123,13 +124,13 @@ void create_Task_WifiCore() {
 void setup() {
     // define inputs
   pinMode(sdata, INPUT);
-  pinMode(BusIO1, INPUT_PULLUP);
-  pinMode(BusIO2, INPUT_PULLUP);
+  pinMode(HostIO1, INPUT_PULLUP);
+  pinMode(HostIO2, INPUT_PULLUP);
   pinMode(resetSwitch, INPUT_PULLUP);
 
   // define interrupts
-  attachInterrupt(BusIO1, isr_io1, FALLING);         // interrupt for io1, Atari writes data at $D502
-  attachInterrupt(BusIO2, isr_io2, FALLING);         // interrupt for io2, Atari reads data at $D502
+  attachInterrupt(HostIO1, isr_io1, FALLING);         // interrupt for io1, Atari writes data at $D502
+  attachInterrupt(HostIO2, isr_io2, FALLING);         // interrupt for io2, Atari reads data at $D502
   attachInterrupt(resetSwitch, isr_reset, FALLING);  // interrupt for reset button
 
 
@@ -219,10 +220,8 @@ void setup() {
   } else {
     settings.begin("mysettings", false);
     settings.putInt("doReset", 0);
-
     messageIds[0] = settings.getULong("lastPubMessage", 0);
     messageIds[1] = settings.getULong("lastPrivMessage", 0);
-
     settings.end();
     pastMatrix = true;
     hangup=millis();
@@ -266,12 +265,12 @@ void loop() {
 
   if (isWifiCoreConnected and wificonnected == -1) wificonnected = 1;  // only set wificonnected if it has not been set
 
-  if (dataFromBus) {
-    dataFromBus = false;
+  if (dataFromHost) {
+    dataFromHost = false;
     ready_to_receive(false);  // flow controll
     lastCommand=ch;
 #ifdef debug
-    Serial.printf("incomming command: %d\n", lastCommand);
+    //Serial.printf("incoming command: %d\n", lastCommand);
 #endif
 
     //
@@ -322,7 +321,6 @@ void loop() {
       case 254:
         {
           hangup = millis();
-          //Serial.println("Incomming 254");
           // ------------------------------------------------------------------------------
           // start byte 254 = Computer triggers call to the website for new public message
           // ------------------------------------------------------------------------------
@@ -332,60 +330,19 @@ void loop() {
           doUrgentMessage();
           // if the user list is empty, get the list
           // also refresh the userlist when we switch from public to private messaging and vice versa
-          if (users.length() < 1 or msgtype != "public") { 
-            updateUserlist = true;
-          }
+          if (onLineUsers.length() < 1 or msgtype != "public") updateUserlist = true;
           msgtype = "public";
-
-          // do we have any messages in the page buffer?
-          // find the first '{' in the page buffer
-          int p = 0;
-          char cc = 0;
-          bool found = false;
-          // find first {
-          while (cc != '{' and p < 10) {
-            cc = multiMessageBufferPub[pos0++];
-            p++;
-          }
-          // fill buffer until we find '}'
-          if (cc == '{') {
-            msgbuffer[0] = cc;
-            found = true;
-            getMessage = false;
-            p = 1;
-            while (cc != '}') {
-              cc = multiMessageBufferPub[pos0++];
-              // put this line into the msgbuffer buffer
-              if (cc != 10) msgbuffer[p++] = cc;
-            }
-          }
-          if (found) {
-            found = false;
-            Deserialize();
+          if (getMessageFromMMBuffer(multiMessageBufferPub, &publicBufferIndex, false)) {
+            if (Deserialize() == 1) {              
+              // deserialize returns 1 of there was a message in the buffer (2 for private message).
+              translateAtariMessage();
+              send_buffer_to_host(outbuffer, outbuffersize);  // send it
+              messageIds[0] = tempMessageIds[0];             // store the new message id;
+            } else sendByte(128);                            // no more messages for now.              
           } else {
-            // clear the buffer
-            for (int y = 0; y < 3500; y++) {
-              multiMessageBufferPub[y] = 0;
-            }
-            pos0 = 0;
+            sendByte(128);  // no more messages for now.
             getMessage = true;
           }
-
-          if (haveMessage == 1) {
-            translateAtariMessage();
-            // and send the outbuffer
-            send_out_buffer_to_Bus();
-            // store the new message id
-            if (haveMessage == 1) {
-              // store the new message id
-              messageIds[0] = tempMessageIds[0];
-            }
-            haveMessage = 0;
-          } else {  // no public messages :-(
-            //Serial.println("No message");
-            sendByte(128);
-          }
-          //Serial.println("Done, break");
           break;
         }
 
@@ -396,7 +353,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // we expect a chat message from the Computer
           
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
 
           String toEncode = "[145]";
           String RecipientName = "";
@@ -439,7 +396,7 @@ void loop() {
             Serial.print("Name under test: ");
             Serial.println(test_name);
 #endif
-            if (users.indexOf(test_name + ';') >= 0) {
+            if ((offLineUsers.indexOf(test_name + ';') >= 0) or (onLineUsers.indexOf(test_name + ';') >= 0)) {
               // user exists
               msgtype = "private";
               pmSender = '@' + RecipientName;
@@ -458,15 +415,9 @@ void loop() {
           toEncode.trim();
 
           int buflen = toEncode.length() + 1;
-          //Serial.print("Buffer len=");
-          //Serial.println(buflen - mstart);
-          //Serial.println(toEncode);
           if (buflen -mstart <= 7) break;                  // this is an empty message! do not send it.
           char buff[buflen];
           toEncode.toCharArray(buff, buflen);
-          //Serial.print("toEncode=");
-          //Serial.println(toEncode);
-
           String Encoded = my_base64_encode(buff, buflen);
 
           // Now send it with retry!
@@ -506,7 +457,7 @@ void loop() {
           // 252 = Computer sends the new wifi network name (ssid) AND password AND time offset
           // ------------------------------------------------------------------------------
 
-          receive_buffer_from_Bus(3);
+          receive_buffer_from_host(3);
           // inbuffer now contains "SSID password timeoffset"
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -543,7 +494,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 251 = Computer ask for the current wifi ssid,password and time offset
           // ------------------------------------------------------------------------------
-          send_String_to_Bus(ssid + char(129) + password + char(129) + timeoffset);
+          send_String_to_host(ssid + char(129) + password + char(129) + timeoffset);
           break;
         }
 
@@ -566,14 +517,13 @@ void loop() {
 
           if (!isWifiCoreConnected) {
             digitalWrite(CLED, LOW);
-            send_String_to_Bus("0    Not Connected to Wifi         ");
+            send_String_to_host("0    Not Connected to Wifi         ");
           } else {
             wificonnected = 1;
             digitalWrite(CLED, HIGH);
             String wifi_status = "1Connected, ip: " + myLocalIp + "             ";
             wifi_status = wifi_status.substring(0, 35);
-
-            send_String_to_Bus(wifi_status);
+            send_String_to_host(wifi_status);
             if (configured == "empty") {
               configured = "w";
               settings.begin("mysettings", false);
@@ -586,71 +536,31 @@ void loop() {
 
       case 247:
         {
+          hangup = millis();
           // ------------------------------------------------------------------------------
           // start byte 247 = Computer triggers call to the website for new private message
           // ------------------------------------------------------------------------------
-          hangup=millis();
           // send urgent messages first
           doUrgentMessage();
           // if the user list is empty, get the list
           // also refresh the userlist when we switch from public to private messaging and vice versa
-          if (users.length() < 1 or msgtype != "private") {
-            updateUserlist = true;
-            //Serial.println("Update Userlist");
-          }
+          if (onLineUsers.length() < 1 or msgtype != "private") updateUserlist = true;
           msgtype = "private";
-          pmCount = 0;
-          // do we have any messages in the page buffer?
-          // find the first '{' in the page buffer
-          int p = 0;
-          char cc = 0;
-          bool found = false;
-          // find first {
-          while (cc != '{' and p < 10) {
-            cc = multiMessageBufferPriv[pos1++];
-            p++;
-          }
-          // fill buffer until we find '}'
-          if (cc == '{') {
-            msgbuffer[0] = cc;
-            found = true;
-            getMessage = false;
-            p = 1;
-            while (cc != '}') {
-              cc = multiMessageBufferPriv[pos1++];
-              // put this line into the msgbuffer buffer
-              if (cc != 10) msgbuffer[p++] = cc;
-            }
-          }
-          if (found) {
-            found = false;
-            Deserialize();
+          if (getMessageFromMMBuffer(multiMessageBufferPriv, &privateBufferIndex, false)) {
+            if (Deserialize() == 2) {              
+              // deserialize returns 2 of there was a message in the buffer (1 for public message).
+              translateAtariMessage();
+              send_buffer_to_host(outbuffer, outbuffersize);  // send it
+              messageIds[1] = tempMessageIds[1];             // store the new message id;
+              lastprivmsg = messageIds[1];
+              settings.begin("mysettings", false);
+              settings.putULong("lastprivmsg", messageIds[1]);  // store message id in eeprom
+              settings.end();
+            } else sendByte(128);                            // no more messages for now.              
           } else {
-            // clear the buffer
-            for (int y = 0; y < 3500; y++) {
-              multiMessageBufferPriv[y] = 0;
-            }
-            pos1 = 0;
+            sendByte(128);  // no more messages for now.
             getMessage = true;
           }
-          if (haveMessage == 2) {
-            translateAtariMessage();
-            // and send the outbuffer
-            send_out_buffer_to_Bus();
-            if (haveMessage == 2) {
-              // store the new message id
-              messageIds[1] = tempMessageIds[1];
-              lastprivmsg = tempMessageIds[1];
-              settings.begin("mysettings", false);
-              settings.putULong("lastprivmsg", lastprivmsg);
-              settings.end();
-            }
-            haveMessage = 0;
-          } else {  // no private messages :-(
-            sendByte(128);
-            pmCount = 0;
-          }
-          //Serial.println("Done, Break");
           break;
         }
 
@@ -660,7 +570,7 @@ void loop() {
           // start byte 246 = Computer sends a new chat server ip/fqdn
           // ------------------------------------------------------------------------------
 
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
 
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -676,8 +586,7 @@ void loop() {
           messageIds[1] = 0;
 
           // we should also refresh the userlist
-          users = "";
-
+          onLineUsers = "";
           break;
         }
       case 245:
@@ -687,7 +596,7 @@ void loop() {
           // -----------------------------------------------------------------------------------------------------
           // receive the ROM version number
 
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
           char bns[inbuffersize + 1];
           // filter out any unwanted bytes, keep only ./01234567890
           for (int k = 0; k < inbuffersize; k++) {
@@ -716,7 +625,7 @@ void loop() {
           // ---------------------------------------------------------------------------------
           // this will reset all settings
 
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;
@@ -747,7 +656,7 @@ void loop() {
           xMessageBufferReceive(responseBuffer, &responseMessage, sizeof(responseMessage), portMAX_DELAY);
           regStatus = responseMessage.response.str[0];
 
-          send_String_to_Bus(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus + char(128));
+          send_String_to_host(macaddress + char(129) + regID + char(129) + myNickName + char(129) + regStatus + char(128));
           if (regStatus == 'r' and configured == "w") {
             configured = "d";
             settings.begin("mysettings", false);
@@ -761,7 +670,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 242 = Computer ask for the sender of the last private message
           // ------------------------------------------------------------------------------
-          send_String_to_Bus(pmSender);
+          send_String_to_host(pmSender);
           break;
         }
       case 241:
@@ -774,8 +683,8 @@ void loop() {
           if (pmCount < 10) { pm = "0" + pm; }
           pm = "[PM:" + pm + "]";
           if (pmCount == 0) pm = "--";
-          Serial.println(pm);
-          send_String_to_Bus(pm);  // then send the number of messages as a string
+          //Serial.println(pm);
+          send_String_to_host(pm);  // then send the number of messages as a string
           break;
         }
       case 240:
@@ -783,7 +692,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 240 = Computer sends the new registration id and nickname to ESP32
           // ------------------------------------------------------------------------------
-          receive_buffer_from_Bus(2);
+          receive_buffer_from_host(2);
           // inbuffer now contains "registrationid nickname"
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -818,14 +727,12 @@ void loop() {
         }
       case 239:
         {
+          // ------------------------------------------------------------------------------
+          // start byte 238 = Computer asks if updated firmware is available
+          // ------------------------------------------------------------------------------
           if (millis() < (first_check + 10000)) break;          
-          send_String_to_Bus(newVersions);
-          if (newVersions != "") {
-            Serial.print("new version available! :");
-            Serial.println(newVersions);
-            delay(10);
-            urgentMessage = "New version available, press [ESC]";
-          } 
+          send_String_to_host(newVersions);
+          if (newVersions != "") urgentMessage = "New version available, press [ESC]";
           break;
         }
       case 238:
@@ -835,27 +742,17 @@ void loop() {
           // ------------------------------------------------------------------------------
           ServerConnectResult = "Connection: Unknown, try again";
           commandMessage.command = ConnectivityCheckCommand;
-          xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
+          xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);          
           break;
         }
-
       case 237:
         {
           // ------------------------------------------------------------------------------
           // start byte 237 = Computer triggers call to receive connection status
           // ------------------------------------------------------------------------------
-
-          send_String_to_Bus(ServerConnectResult);
-
-          if ((configured == "w") and (ServerConnectResult == "Connected to chat server!")) {
-            configured = "s";
-            settings.begin("mysettings", false);
-            settings.putString("configured", "s");
-            settings.end();
-          }
+          send_String_to_host(ServerConnectResult);
           break;
         }
-
       case 236:
         {
           // ------------------------------------------------------------------------------
@@ -864,16 +761,15 @@ void loop() {
 #ifdef debug
           Serial.println("response 236 = " + configured + " " + server + " " + SwVersion);
 #endif
-          send_String_to_Bus(configured + char(129) + server + char(129) + SwVersion + char(129));
+          send_String_to_host(configured + char(129) + server + char(129) + SwVersion + char(129));
           break;
         }
-
       case 235:
         {
           // ------------------------------------------------------------------------------
           // start byte 235 = Computer sends configuration status
           // ------------------------------------------------------------------------------
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;
@@ -886,33 +782,20 @@ void loop() {
       case 234:
         {
           // Computer asks for user list, first group.
+          // we send a max of 20 users in one long string
           userpageCount = 0;
           String ul1 = userPages[userpageCount];
-          if (ul1.length()<2){
-			        refreshUserPages=true;
-              getMessage = false;
-              //Serial.println("THE USERLIST IS EMPTY");
-              ul1=".EMPTY";
-              send_String_to_Bus(ul1);
-          } else {
-          //Serial.println(ul1);
-          send_String_to_Bus(ul1);
+          send_String_to_host(ul1);
           userpageCount++;
-          }
           break;
         }
       case 233:
         {
           // Computer asks for user list, second or third group.
-          // we send a max of 15 users in one long string
+          // we send a max of 20 users in one long string
           String ul1 = userPages[userpageCount];
-          if (ul1.length() >2){
-            //Serial.println(ul1);
-            send_String_to_Bus(ul1);
-            userpageCount++;
-          } else send_String_to_Bus(" ");
-          
-          if (userpageCount > 7) userpageCount = 7;
+          send_String_to_host(ul1);
+          userpageCount++;
           break;
         }
       case 232:
@@ -923,15 +806,15 @@ void loop() {
         }
       case 231:
         {  // do the update!
-          receive_buffer_from_Bus(1);
+          receive_buffer_from_host(1);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;          
           if (ns.startsWith("UPDATE!")) {
             Serial.println("Update = GO <<<<");
             outByte(2);
-            detachInterrupt(BusIO1);  // disable IO1 and IO2 interrupts
-            detachInterrupt(BusIO2);  // disable IO1 and IO2 interrupts
+            detachInterrupt(HostIO1);  // disable IO1 and IO2 interrupts
+            detachInterrupt(HostIO2);  // disable IO1 and IO2 interrupts
             commandMessage.command = DoUpdateCommand;
             xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
           }
@@ -939,29 +822,65 @@ void loop() {
         }
       case 230:
         {
-          dataFromBus=false;
+          dataFromHost=false;
           ready_to_receive(true);          
-          while (dataFromBus == false) {
+          while (dataFromHost == false) {
             delayMicroseconds(2);
           }
           ready_to_receive(false);
           screenColor = ch;
-          dataFromBus=false;
+          dataFromHost=false;
           settings.begin("mysettings", false);
           settings.putUInt("scrcolor", screenColor);
           settings.end();
           break;
         }
-      case 228:
+      case 229:
         {
           // ------------------------------------------------------------------------------
-          // start byte 228 = Debug purposes
+          // start byte 229 = Scroll Up or Down
           // ------------------------------------------------------------------------------
-          Serial.println("The code gets triggered");
-          // your code here :-)
+          static String decoded_message;
+          receive_buffer_from_host(1);
+          if (inbuffer[0] == 0) topMes = 0;
+          systemLineCount = inbuffer[1];
+          pageSize = inbuffer[2];
+          scrollDirection = inbuffer[3];  // 1 = up, 0 = down
+          Serial.println("Scrolling starts");
+          if (waitAck) {
+            // if waitAck is true we repeat the message
+            Serial.println("Waiting for ACK, resending last message");
+            send_String_to_host(decoded_message);
+            break;
+          }
+          if (scrollBufferIndex == 0) {  // send a message to the other core to collect older messages
+            gotScrollMessage = 0;
+            commandMessage.command = ScrollUpDown;
+            xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
+            while (gotScrollMessage == 0) delay(10);  // wait for that procedure to complete
+          }
+          // (more) data is in multiMessageBufferPub, collect a single message from the MMB
+          if (getMessageFromMMBuffer(multiMessageBufferPub, &scrollBufferIndex, false)) {
+            if (Deserialize() == 3) {  // decoded message is in the msgbuffer now
+              if (scrollDirection == 1) topMes = tempMessageIds[2];
+              if (scrollDirection == 0) botMes = tempMessageIds[2];
+              Serial.println("Wait for ACK now");
+              waitAck = true;
+              decoded_message = String(msgbuffer, msgbuffersize);
+              send_buffer_to_host(msgbuffer, msgbuffersize);  // send it
+              if (scrollDirection == 1 and topMes != 0) botMes = 0;
+              break;
+            }
+          }
           sendByte(128);
+          waitAck = false;
           break;
-        }
+        } 
+      case 227:
+        {
+          waitAck = false;
+          break; 
+        }  
       default:
         {
           sendByte(128);
@@ -970,15 +889,15 @@ void loop() {
     }  // end of case statements
 
 
-  }  // end of "if (dataFromBus)"
+  }  // end of "if (dataFromHost)"
   else {
     if ((lastCommand==247 or lastCommand==254 or lastCommand==239 or lastCommand==241) and (millis() - hangup) > 2000){
        hangup=millis();
        sendByte(128);
-       Serial.print("                     Prevented hangup with command ");
+       Serial.print("Prevented hangup with command: ");
        Serial.println(lastCommand);
     }
-    // No data from computer bus
+    // No data from host
   }
 }  // end of main loop
 
@@ -993,34 +912,29 @@ void outByte(byte c) {
 }
 
 // ******************************************************************************
-// void: send a string to the Computer Bus
+// void: send a string to the Computer
 // ******************************************************************************
-void send_String_to_Bus(String s) {
-
-  outbuffersize = s.length() + 1;           // set outbuffer size
-                                            //  Serial.print("buffersize=");
-                                            //  Serial.println(outbuffersize);
-  s.toCharArray(outbuffer, outbuffersize);  // place the ssid in the output buffer
-  send_out_buffer_to_Bus();                 // and send the buffer
+void send_String_to_host(String s) {
+  outbuffersize = s.length() + 1;              // set outbuffer size
+  s.toCharArray(outbuffer, outbuffersize);     // place the ssid in the output buffer
+  send_buffer_to_host(outbuffer,outbuffersize); // and send the buffer
 }
 
 // ******************************************************************************
-// Send the content of the outbuffer to the Bus
+// Send the content of the outbuffer to the host
 // ******************************************************************************
-void send_out_buffer_to_Bus() {
-  int lastbyte = 0;
-  // send the content of the outbuffer to the Bus
-  for (int x = 0; x < outbuffersize - 1; x++) {
+void send_buffer_to_host(char *buffer, int buffSize) {
+  int lastbyte;
+  // send the content of a buffer to the C64
+  for (int x = 0; x < buffSize - 1; x++) {
     delayMicroseconds(500);
-    if (sendByte(outbuffer[x])== false) x=outbuffersize;
+    sendByte(buffer[x]);
     lastbyte = outbuffer[x];
   }
-  // all done, send end byte if not send yet
-  if (lastbyte != 128) {
+  if (lastbyte != 128) {  // all done, send end byte if not send yet
     delayMicroseconds(500);
     sendByte(128);
   }
-  outbuffersize = 0;
 }
 
 // ******************************************************************************
@@ -1034,9 +948,9 @@ void debug_print_inbuffer() {
 }
 
 // ******************************************************************************
-//  void to receive characters from the Bus and store them in a buffer
+//  void to receive characters from the host and store them in a buffer
 // ******************************************************************************
-void receive_buffer_from_Bus(int cnt) {
+void receive_buffer_from_host(int cnt) {
 
   // cnt is the number of transmissions we put into this buffer
   // This number is 1 most of the time
@@ -1047,18 +961,18 @@ void receive_buffer_from_Bus(int cnt) {
     ready_to_receive(true);  // ready for next byte
     unsigned long timeOut = millis() + 50;
 
-    while (dataFromBus == false) {
+    while (dataFromHost == false) {
       delayMicroseconds(2);  // wait for next byte
       if (millis() > timeOut) {
         ch = 128;
-        dataFromBus = true;
+        dataFromHost = true;
 #ifdef debug
         Serial.println("Timeout in receive buffer");
 #endif
       }
     }
     ready_to_receive(false);
-    dataFromBus = false;
+    dataFromHost = false;
     inbuffer[i] = Atari_to_Ascii(ch);
     //Serial.print(inbuffer[i]);
     i++;
@@ -1084,7 +998,7 @@ void receive_buffer_from_Bus(int cnt) {
 
 
 // ******************************************************************************
-// send a single byte to the Bus
+// send a single byte to the Host
 // ******************************************************************************
 bool sendByte(byte b) {
   bool result=true;
@@ -1105,57 +1019,6 @@ bool sendByte(byte b) {
   ready_to_send(false);
   io2 = false;
   return result;
-}
-
-
-// ******************************************************************************
-// Deserialize the json encoded messages
-// ******************************************************************************
-void Deserialize() {
-  DynamicJsonDocument doc(512);                                  // next we want to analyse the json data
-  DeserializationError error = deserializeJson(doc, msgbuffer);  // deserialize the json document
-
-  if (!error) {
-    unsigned long newMessageId = doc["rowid"];
-    // if we get a new message id back from the database, that means we have a new message
-    // if the database returns the same message id, there is no new message for us..
-    bool newid = false;
-    String channel = doc["channel"];
-    if ((channel == "private") and (newMessageId != messageIds[1])) {
-      newid = true;
-      tempMessageIds[1] = newMessageId;
-      String nickname = doc["nickname"];
-    }
-
-    if ((channel == "public") and (newMessageId != messageIds[0])) {
-      newid = true;
-      tempMessageIds[0] = newMessageId;
-    }
-    if (newid) {
-      String message = doc["message"];
-      String decoded_message = ' ' + my_base64_decode(message);
-      int lines = doc["lines"];
-      int msize = decoded_message.length() + 1;
-      decoded_message.toCharArray(msgbuffer, msize);
-      int outputLength = decoded_message.length();
-      msgbuffersize = (int)outputLength;
-      msgbuffer[0] = lines;
-      msgbuffersize += 1;
-
-      pmCount = doc["pm"];
-      haveMessage = 1;
-      if (msgtype == "private") haveMessage = 2;
-
-    } else {
-
-      pmCount = doc["pm"];
-
-      // we got the same message id back, so no new messages:
-      msgbuffersize = 0;
-      haveMessage = 0;
-    }
-    doc.clear();
-  }
 }
 
 // ******************************************************************************
@@ -1179,71 +1042,32 @@ void doUrgentMessage() {
       outbuffer[x] = b;
     }
 
-    send_out_buffer_to_Bus();
+    send_buffer_to_host(outbuffer,outbuffersize);
     urgentMessage = "";
   }
-}
-
-void loadPrgfile() {
-  int delayTime = 150;
-  //delay(2000);  // give the computer some time to boot
-  ch = 0;
-  ready_to_receive(true);
-  Serial.println("Waiting for start signal");
-  int i = 0;
-  while (ch != 100) {  // wait for the computer to send byte 100
-    ready_to_receive(true);
-  }
-
-
-  Serial.println("------ LOAD PRG FILE ------");
-  delayMicroseconds(delayTime);
-  sendByte(screenColor);
-  delayMicroseconds(delayTime);
-  sendByte(lowByte(sizeof(prgfile) - 6));
-  delayMicroseconds(delayTime);
-  sendByte(highByte(sizeof(prgfile) - 6));
-
-  for (int x = 6; x < sizeof(prgfile); x++) {  // Now send all the rest of the bytes
-    delayMicroseconds(delayTime);
-    sendByte(prgfile[x]);
-  }
-
-  Serial.println("------ PRG FILE DONE ------");
-  ch = 0;
-  ready_to_receive(false);
-  io2 = false;
-  dataFromBus = false;
 }
 
 void translateAtariMessage() {
   // do some translations for Atari 800 XL
   // first byte is number of lines.
-
-  // for the atari we start with a number of shift up commands (1)
+  // for the atari we start with a number of 'shift up commands' 
   int sp = msgbuffer[0];
-  int y = 0;
+  outbuffersize = 0;
   for (int a = 0; a < sp; a++) {
     outbuffer[a] = 1;  // 1 means shift up one line.  1,1,1 means shift up 3 lines
   }
-  y = sp;
+  outbuffersize = sp;
   // now convert to internal codes (screen codes)
   for (int x = 1; x < msgbuffersize; x++) {
     int b = msgbuffer[x];
     if (b < 97) b = b - 32;
     if (b >= 160 and b < 192) b = b - 32;
     else if (b > 191 and b < 225) b = b - 32;
-
     if (b == 128) b = 254;
-    outbuffer[y] = b;
-    y++;
+    outbuffer[outbuffersize] = b;
+    outbuffersize++;
   }
-
-  // copy the buffer size also
-  outbuffersize = y;
 }
-
-
 
 void ready_to_receive(bool b) {
   if (b)

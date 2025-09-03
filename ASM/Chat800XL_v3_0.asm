@@ -823,10 +823,9 @@ pbar                                              //
                                                   // 
 updRest                                           // 
   displayText UPDATEDONE,#17,#2                   // 
-  lda #255                                        // 
+  lda #254                                        // 
   sta DELAY                                       // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  jsr doubledelay                                 //  
   jmp $E477                                       // 
 // ----------------------------------------------------------------------
 // Clear the keyboardbuffer and also clear the screen
@@ -899,15 +898,15 @@ ul_start                                          //
 ul_novice                                         // 
   lda TEMPBYTE                                    // 
   jsr send_start_byte                             // RXBUFFER now contains the first group of users, 20
-  displayBuffer RXBUFFER,#4 ,#2,#0                // 
+  displayBuffer RXBUFFER,#4 ,#0,#0                // 
                                                   // 
   lda #233                                        // 
   jsr send_start_byte                             // RXBUFFER now contains the second group of users, 40
-  displayBuffer RXBUFFER,#9 ,#2,#0                // 
+  displayBuffer RXBUFFER,#9 ,#0,#0                // 
                                                   // 
   lda #233                                        // 
   jsr send_start_byte                             // RXBUFFER now contains the second group of users, 40
-  displayBuffer RXBUFFER,#14 ,#2,#0               // 
+  displayBuffer RXBUFFER,#14 ,#0,#0               // 
                                                   // 
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
   displayText TEXT_USER_LIST_foot, #23,#1         // draw the menu on the bottom line
@@ -1041,11 +1040,9 @@ account_save_settings                             //
   jsr read_field                                  // 
                                                   // 
                                                   // 
-  mva #255 DELAY                                  // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  mva #254 DELAY                                  // 
+  jsr doubledelay                                 // 
+  jsr doubledelay                                 // 
   jsr get_status                                  // 
   jmp account_setup                               // 
                                                   // 
@@ -1072,10 +1069,8 @@ server_setup:                                     //
   jsr wait_for_RTR                                // 
   lda #238                                        // 
   sta $D502                                       // 
-  mva #255 DELAY                                  // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
-                                                  // 
+  mva #254 DELAY                                  // 
+  jsr tripledelay                                 // 
   lda #237                                        // get server connection status
   jsr send_start_byte                             // 
   displayBuffer  RXBUFFER,#23 ,#3,#0              // the RX buffer now contains the server status
@@ -1124,9 +1119,7 @@ server_save_settings                              //
   jsr wait_for_RTR                                // 
   lda #238                                        // 
   sta $D502                                       // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  jsr tripledelay                                 // 
   jsr get_status                                  // 
   jmp server_setup                                // 
                                                   // 
@@ -1231,8 +1224,7 @@ wifi_save_settings:                               //
   mva #10 TEXTBOXLEN                              // 
   jsr read_field                                  // 
   mva #255 DELAY                                  // wait for wifi
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  jsr doubledelay                                 //  
   mva #10 TEMP_I                                  // 
 wait_for_wifi                                     // 
   displayText TEXT_COUNTER,#23,#34                // 
@@ -1240,8 +1232,7 @@ wait_for_wifi                                     //
   lda WIFISTATUS                                  // 
   cmp #49                                         // 
   beq exit_wait                                   // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  jsr doubledelay                                 //  
   lda TEXT_COUNTER+1                              // 
   cmp #49                                         // 
   bne dec2                                        // 
@@ -1353,11 +1344,6 @@ check_matrix                                      //
   lda #100                                        // Delay 100... hamsters
   sta DELAY                                       // Store 100 in the DELAY variable
   jsr jdelay                                      // and call the delay subroutine
-//  jsr wait_for_RTS
-//  lda $D502
-//  sta COLOR4
-//  sta COLOR2
-//  jsr jdelay
   jsr wait_for_RTS                                // 
   lda $D502                                       // read from cartridge
   cmp #128                                        // 
@@ -1904,7 +1890,7 @@ su_scr1:
   rts
 // ----------------------------------------------------------------------                                                  
 scroll_up:
-  jmp exit_sd
+  // jmp exit_sd
   lda SCREEN_ID
   cmp #3
   bne cont_scroll_up
@@ -2060,37 +2046,29 @@ silent                                            //
 // SUB ROUTINE, DELAY
 //=========================================================================================================
 jdelay:                                           // the delay sub routine is just a loop inside a loop
-    pha                                           // Backup a,x,y registers to the stack
-    txa                                           //
-    pha                                           // Backup a,x,y registers to the stack
-    tya                                           //
-    pha                                           // Backup a,x,y registers to the stack
-	                                                 // 
-    ldx #00                                       // the inner loop counts up to 255
-                                                  // 
+  pha                                             // Backup a,x,y registers to the stack
+  txa                                             //
+  pha                                             // Backup a,x,y registers to the stack
+  tya                                             //
+  pha                                             // Backup a,x,y registers to the stack
+  ldx #00                                         // the inner loop counts up to 255
 loop_d1                                           // the outer loop repeats that 255 times
-                                                  // 
-    cpx DELAY                                     // 
-    beq enddelay                                  // 
-    inx                                           // 
-    ldy #00                                       // 
-                                                  // 
+  cpx DELAY                                       // 
+  beq enddelay                                    // 
+  inx                                             // 
+  ldy #00                                         // 
 dodelay                                           // 
-                                                  // 
-    cpy #255                                      // 
-    beq loop_d1                                   // 
-    iny                                           // 
-    jmp dodelay                                   // 
-                                                  // 
+  cpy #255                                        // 
+  beq loop_d1                                     // 
+  iny                                             // 
+  jmp dodelay                                     // 
 enddelay                                          // 
   pla                                             // Pull a,x,y registers from the stack
-	tay                                              // 
-	pla                                              // 
-	tax                                              // 
-	pla                                              // 
-  rts                                             // 
-                                                  // 
-                                                  // 
+	tay                                             // 
+	pla                                             // 
+	tax                                             // 
+	pla                                             // 
+  rts                                             //  
 // ----------------------------------------------------------------------
 //  Clear input lines
 // ----------------------------------------------------------------------
@@ -2679,17 +2657,27 @@ doNotSend                                         //
   jsr show_cursor                                 // 
 check_p_exit                                      // 
   rts                                             // 
-                                                  // 
-bigdelay                                          // 
+
+doubledelay                                       // 
   lda #255                                        // 
   sta DELAY                                       // 
   jsr jdelay                                      // 
   jsr jdelay                                      // 
+  rts   
+
+tripledelay                                       // 
+  lda #255                                        // 
+  sta DELAY                                       // 
   jsr jdelay                                      // 
+  jsr jdelay                                      //
   jsr jdelay                                      // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
-  jsr jdelay                                      // 
+  rts   
+
+  
+bigdelay                                          // 
+  jsr tripledelay
+  jsr tripledelay
+  jsr tripledelay
   rts                                             // 
                                                   // 
 getPmUser:                                        // read the pm user from screen
@@ -3152,7 +3140,7 @@ STARTLINE3 .byte 0,0                              // start address when message 
 STARTLINE2 .byte 0,0                              // start address when message is 2 lines
 STARTLINE1 .byte 0,0                              // start address when message is 1 lines
 PMUSER   .byte 32,37,'liza',0,128,128,128,128,128,128,128,128,128,128,128,128// 
-RXBUFFER :150 .byte 128                           // 
+RXBUFFER :250 .byte 128                           // 
 SPLITBUFFER :40 .byte 128                         // 
 RTSTO .byte 0                                     // RTS Timeout 
 RTRTO .byte 0                                     // RTR Timeout

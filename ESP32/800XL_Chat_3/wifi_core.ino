@@ -6,12 +6,16 @@
 #include "common.h"
 #include "utils.h"
 #include "wifi_core.h"
-
+volatile long topMes = 0;
+volatile long botMes = 0;
+volatile int gotScrollMessage;
+volatile int systemLineCount;
+volatile int pageSize = 5;
+volatile int scrollDirection = 1;
 String regID = "";       // String variale for your regID (leave it empty!)
 String macaddress = "";  // variable for the mac address (leave it empty!)
 String myNickName = "";  // variable for your nickname (leave it empty!)
-String ServerConnectResult = "Status is Unknown";
-byte ResultColor = 144;
+String ServerConnectResult ;
 int pmCount = 0;       // counter for the number of unread private messages
 String pmSender = "";  // name of the personal message sender
 unsigned long lastWifiBegin;
@@ -20,6 +24,7 @@ String ssid = "empty";      // do not change this!
 String password = "empty";  // do not change this!
 String timeoffset = "empty";
 String server = "empty";  // do not change this!
+String configured = "empty";  // do not change this!
 String myLocalIp = "0.0.0.0";
 volatile unsigned long messageIds[] = { 0, 0 };
 volatile unsigned long tempMessageIds[] = { 0, 0 };
@@ -30,126 +35,35 @@ volatile bool updateUserlist = false; // user list to check existing users
 volatile bool refreshUserPages = true; // user list for 'who is online'
 char msgbuffer[500];  // a character buffer for a chat message
 volatile int msgbuffersize = 0;
-volatile int haveMessage = 0;
 volatile bool getMessage = false;
 volatile bool pastMatrix = false;
 volatile bool aboutToReset = false;
 volatile bool sendingMessage = false;
-String userPages[8];
+String userPages[16];
 String romVersion = "0.0";
 String newVersions ="";
 MessageBufferHandle_t commandBuffer;
 MessageBufferHandle_t responseBuffer;
 bool isWifiCoreConnected = false;
 int lastp = 0;
+String onLineUsers = "";
+String offLineUsers = "";
+int updateCount=0;
 
-// ***************************************************************
-//   get the list of users from the webserver
-// ***************************************************************
-void fill_userlist() {
-  // this get the list of users, the long string of users. Not the who's on line screen.
-  String oldusers = users;
-  String serverName = "http://" + server + "/zxListUsers.php";
+// ****************************************************
+//  get response from HTTP Server
+// ****************************************************
+String getHttpResponse(String pagename, String httpRequestData, int* httpResponseCode) {
+  String result = "";
+  String serverName = "http://" + server + "/" + pagename;
   WiFiClient client;
   HTTPClient http;
-  http.begin(client, serverName);
-  // Specify content-type header
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-  // Prepare your HTTP POST request data
-  String httpRequestData = "regid=" + regID + "&call=list";
-
-  // Send HTTP POST request
+  http.begin(client, serverName);                                       // Connect to configured server
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");  // Specify content-type header
   unsigned long responseTime = millis();
-  int httpResponseCode = http.POST(httpRequestData);
+  *httpResponseCode = http.POST(httpRequestData);
   responseTime = millis() - responseTime;
   if (responseTime > 10000) softReset();
-  String result = "0";
-
-  if (httpResponseCode == 200) {
-    users = http.getString();
-    users.trim();
-#ifdef debug
-    Serial.println(users);
-#endif
-  } else {
-    result = "communication error";
-    users = oldusers;
-  }
-
-  // Free resources
-  http.end();
-  client.stop();
-}
-
-// *************************************************
-//  void to send a message to the server
-// *************************************************
-bool SendMessageToServer(String Encoded, String RecipientName, int retryCount, bool heartbeat) {
-
-  String serverName = "http://" + server + "/insertMessage.php";
-  WiFiClient client;
-  HTTPClient http;
-  bool result = false;
-  // Your Domain name with URL path or IP address with path
-  http.begin(client, serverName);
-
-  // Specify content-type header
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-
-  // Prepare your HTTP POST request data
-  String httpRequestData = "";
-  if (heartbeat) {
-    httpRequestData = "regid=" + regID + "&call=heartbeat";
-  } else {
-    httpRequestData = "sendername=" + myNickName + "&retryCount=" + retryCount + "&regid=" + regID + "&recipientname=" + RecipientName + "&message=" + Encoded;
-  }
-
-  // Send HTTP POST request
-  unsigned long responseTime = millis();
-  int httpResponseCode = http.POST(httpRequestData);
-  responseTime = millis() - responseTime;
-  if (responseTime > 10000) softReset();
-
-  // httpResponseCode should be 200
-  if (httpResponseCode == 200) {
-    result = true;
-  }
-  // Free resources
-  http.end();
-  client.stop();
-  return result;
-}
-
-// *******************************************************
-//  String function to get the userlist from the database
-// *******************************************************
-void get_full_userlist() {
-  // this is for the user list in the menu (Who is on line?)
-  // The second core calls this webpage so the main thread does not suffer performance
-  // Serial.println("GET FULL USER LIST");
-  for (int p = 0; p < 8; p++) {
-    userPages[p] = getUserList(p);    
-  }
-}
-
-String getUserList(int page) {
-  String serverName = "http://" + server + "/XLlistUsers.php";
-  WiFiClient client;
-  HTTPClient http;
-  http.setReuse(1);
-  http.begin(client, serverName);
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  
-  String httpRequestData = "regid=" + regID + "&pagesize=15&page=" + page + "&version=2";
-  int httpResponseCode = http.POST(httpRequestData);
-
-  // debug voor lege userlist
-  //Serial.print("==>> response van XLlistUsers.php = ");
-  //Serial.println(httpResponseCode);
-  // einde debug voor lege userlist
-  
-  String result = "0";
   result = http.getString();
   result.trim();
   http.end();
@@ -157,84 +71,136 @@ String getUserList(int page) {
   return result;
 }
 
+// ***************************************************************
+//   Scroll up / down routine
+// ***************************************************************
+void scrolling() {
+  int lm = 21 - systemLineCount;
+  int httpResponseCode = 0;
+  if (scrollDirection == 1 and topMes == 0) botMes = messageIds[0];  // direction 1 = up
+  //if (scrollDirection==0 and botMes == 0) botMes = messageIds[0];  // direction 0 = down
+  String httpRequestData = "regid=" + regID + "&bm=" + botMes + "&tm=" + topMes + "&d=" + scrollDirection + "&p=" + pageSize + "&lm=" + lm + "&t=" + timeoffset;
+  String result = getHttpResponse("scrollUp.php", httpRequestData, &httpResponseCode);
+  if (httpResponseCode == 200) {
+    msgbuffersize = result.length() + 1;
+    result.toCharArray(multiMessageBufferPub, msgbuffersize);
+    multiMessageBufferPub[msgbuffersize] = 128;
+  } else {
+    Serial.print("response = ");
+    Serial.println(httpResponseCode);
+  }
+  gotScrollMessage = 1;  // unconditional, prevent endless loop
+}
+
+// ***************************************************************
+//   get the list of users from the webserver
+// ***************************************************************
+void fill_userlist() {
+  // we get a list of users.
+  // the list starts with on-line users,
+  // followed by "_sep_", followed by off line users.
+  String oldusers1 = onLineUsers;
+  String oldusers2 = offLineUsers;
+
+  int httpResponseCode = 0;
+  String users = getHttpResponse("listUsers.php", "regid=" + regID + "&system=Atari&call=list2", &httpResponseCode);
+  if (httpResponseCode == 200) {
+    int sepindex = users.indexOf("_sep_");
+    onLineUsers = users.substring(0, sepindex);
+    offLineUsers = users.substring(sepindex + 6);
+    get_full_userlist();
+  } else {
+    onLineUsers = oldusers1;
+    offLineUsers = oldusers2;
+  }
+}
+
+// *******************************************************
+//  String function to get the userlist from the database
+// *******************************************************
+void get_full_userlist() {
+  // this is for the user list in the menu (Who is on line?)
+  // invert the online users (add 128 to the byte)
+  String input=onLineUsers;
+  String allUsers;
+  for (int i = 0; i < input.length(); i++) {
+     char c = input[i];
+     if (c != ' ' && c != ';')  c = c + 128; // Add 128 to non-space characters
+     allUsers += c; // Append to output string
+   }
+  // now add the offline users. 
+  allUsers += ";" + offLineUsers + ";";
+  int start=0;
+  int pageIndex = 0;
+  int nameCount = 0;
+  int maxNamesPerGroup = 15;
+  int end = allUsers.indexOf(';');
+  // empty all userpages first
+  for (int x = 0; x < 16; x++) userPages[x] = "";
+  while (end != -1) {
+    String name = allUsers.substring(start, end);
+    name.trim();
+    if (name.length() > 0) {
+      if (nameCount >= maxNamesPerGroup) {
+        pageIndex++;
+        nameCount = 0;
+      }
+      int pad=13;
+      if ((nameCount + 1) % 3 == 0) pad=14; 
+      name.trim();
+      name = (name + "                  ").substring(0, pad);  // pad the name to 13 or 14 characters
+      userPages[pageIndex] += name;
+      nameCount++;
+    }
+    start = end + 1;
+    end = allUsers.indexOf(';', start);
+  }
+}
+
+// *************************************************
+//  void to send a message to the server
+// *************************************************
+bool SendMessageToServer(String Encoded, String RecipientName, int retryCount, bool heartbeat) {
+  // Prepare your HTTP POST request data
+  String httpRequestData = "";
+  int httpResponseCode = 0;
+  if (heartbeat) httpRequestData = "regid=" + regID + "&call=heartbeat";
+  else httpRequestData = "sendername=" + myNickName + "&retryCount=" + retryCount + "&regid=" + regID + "&recipientname=" + RecipientName + "&message=" + Encoded;
+  String resultstr = getHttpResponse("insertMessage.php", httpRequestData, &httpResponseCode);
+  if (httpResponseCode == 200) return true;
+  return false;
+}
+
 // ****************************************************
 //  char function that returns the registration status
 // ****************************************************
 char getRegistrationStatus() {
-  String serverName = "http://" + server + "/getRegistration.php";
-  WiFiClient client;
-  HTTPClient http;
-  // Connect to configured server
-  http.begin(client, serverName);
-  // Specify content-type header
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-  // Prepare your HTTP POST request data
-  String httpRequestData = "macaddress=" + macaddress + "&regid=" + regID + "&nickname=" + myNickName + "&version=" + SwVersion;
-  unsigned long responseTime = millis();
-  int httpResponseCode = http.POST(httpRequestData);
-  responseTime = millis() - responseTime;
-  if (responseTime > 10000) softReset();
-  char result = 'x';
-  
-  if (httpResponseCode == 200) {
-    String textOutput = http.getString();
-    textOutput.trim();
-
-    if (textOutput == "r200") result = 'r';       // registration and nickname are good.
-    else if (textOutput == "r105") result = 'n';  // registration is good but nickname is taken by someone else
-    else if (textOutput == "r104") result = 'u';  // registration is not good
-  }
-
-  return result;
+  int i = 0;
+  String HttpResult = getHttpResponse("getRegistration.php", "macaddress=" + macaddress + "&regid=" + regID + "&nickname=" + myNickName + "&version=" + SwVersion, &i);
+  if (HttpResult.indexOf("r200") != -1) return 'r';
+  if (HttpResult.indexOf("r105") != -1) return 'n';
+  if (HttpResult.indexOf("r104") != -1) return 'u';
+  return 'x';
 }
 
 // *************************************************
 //  void to check connectivity to the server
 // *************************************************
 void ConnectivityCheck() {
-
-  String serverName = "http://" + server + "/connectivity.php";
-#ifdef debug
-  Serial.print("Current configured Server: ");
-  Serial.println(server);
-#endif
-  WiFiClient client;
-  HTTPClient http;
-
-  http.begin(client, serverName);                                       // Connect to configured server
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");  // Specify content-type header
-                                                                        // Prepare your HTTP POST request data
-  String httpRequestData = "checkcon=1";                                // Send HTTP POST request
-  unsigned long responseTime = millis();
-  int httpResponseCode = http.POST(httpRequestData);  // httpResponseCode should be "connected"
-  responseTime = millis() - responseTime;
-  if (responseTime > 10000) softReset();
-  if (httpResponseCode > 0) {                // get the response from the php page.
-    ServerConnectResult = http.getString();  // Connected: Connected to database
-    ServerConnectResult.trim();              // Not connected: Not connected to database
-#ifdef debug
-    Serial.println("server response: " + ServerConnectResult);
-#endif
-    if (ServerConnectResult == "Connected") {
-      ResultColor = 149;  // color is green
-      ServerConnectResult = "Connected to chat server!";
-    } else if (ServerConnectResult == "Not connected") {
-      ResultColor = 146;  // color is red
-      ServerConnectResult = "Server found but failed to connect";
-    } else {
-      ResultColor = 146;  // color is red
-      ServerConnectResult = "No chatserver here!";
-    }
-  } else {
-    ResultColor = 146;  // color is red
+  int httpResponseCode = 0;
+  ServerConnectResult = getHttpResponse("connectivity.php", "checkcon=1", &httpResponseCode);
+  if (httpResponseCode != 200) {
     ServerConnectResult = "Error, check server name!";
-#ifdef debug
-    Serial.print("Error code in ConnectivityCheck: ");
-    Serial.println(httpResponseCode);
-#endif
+    return;
   }
-  http.end();
-  client.stop();
+  if (ServerConnectResult.indexOf("Not connected") != -1) {
+    ServerConnectResult = "Server found but failed to connect";
+    return;
+  }
+  if (ServerConnectResult.indexOf("Connected") != -1) {
+    ServerConnectResult = "Connected to chat server!";
+    return;
+  }
 }
 
 // **************************************************
@@ -295,6 +261,9 @@ void WifiCoreLoop(void* parameter) {
         case DoUpdateCommand:
           doUpdate();
           break;
+        case ScrollUpDown:
+          scrolling();
+          break;
         default:
           Serial.print("Invalid Command Message: ");
           Serial.println(commandMessage.command);
@@ -323,55 +292,17 @@ void WifiCoreLoop(void* parameter) {
       if (updateUserlist and !getMessage and pastMatrix and !sendingMessage) {
         updateUserlist = false;
         fill_userlist();
-      }
-      if (refreshUserPages){
-        //Serial.print("getMessage=");
-        //Serial.println(getMessage);
-        //Serial.print("pastMatrix=");
-        //Serial.println(pastMatrix);
-        //Serial.print("sendingMessage=");
-        //Serial.println(sendingMessage);
-      }
-      if (refreshUserPages and !getMessage and pastMatrix and !sendingMessage) {
-        refreshUserPages = false;
-        get_full_userlist();
-        last_up_refresh = millis();
-      }
+      }      
       continue;
     }
 
     // when the getMessage variable goes True, we drop out of the wait loop
     getMessage = false;                                                 // first reset the getMessage variable back to false.
-    String serverName = "http://" + server + "/XLReadAllMessages.php";  // set up the server and needed web page
-    WiFiClient client;
-    HTTPClient httpb;
-
-    httpb.setReuse(0);
-    httpb.begin(client, serverName);                                       // start the http connection
-    httpb.addHeader("Content-Type", "application/x-www-form-urlencoded");  // Specify content-type header
-
-    // Prepare your HTTP POST request data
+    int httpResponseCode = 0;
     String httpRequestData = "regid=" + regID + "&lastmessage=" + messageIds[0] + "&lastprivate=" + messageIds[1] + "&previousPrivate=" + lastprivmsg + "&type=" + msgtype + "&version=" + SwVersion + "&rom=" + romVersion + "&t=" + timeoffset;
-#ifdef debug
-    Serial.println(serverName);
-    Serial.println(httpRequestData);
-#endif
-    unsigned long responseTime = millis();
-    // Send HTTP POST request
-    int httpResponseCode = httpb.POST(httpRequestData);
-    responseTime = millis() - responseTime;
-    if (responseTime > 10000) softReset();
-#ifdef debug
-    //Serial.print("http POST took: ");
-    //Serial.print(responseTime);
-    //Serial.println(" ms.");
-    //Serial.print("Response code=");
-    //Serial.println(httpResponseCode);
-#endif
+    String result = getHttpResponse("XLReadAllMessages.php", httpRequestData, &httpResponseCode);   
     if (httpResponseCode == 200) {  // httpResponseCode should be 200
-      String textOutput = httpb.getString();  // capture the response from the webpage (it's json)
-      textOutput.trim();                      // trim the output
-
+      String textOutput = result;      
       msgbuffersize = textOutput.length() + 1;
       if (msgtype == "private") {
         textOutput.toCharArray(multiMessageBufferPriv, msgbuffersize);
@@ -379,17 +310,15 @@ void WifiCoreLoop(void* parameter) {
       if (msgtype == "public") {
         textOutput.toCharArray(multiMessageBufferPub, msgbuffersize);
       }
-
+      
+      
       textOutput = "";
       heartbeat = millis();  // readAllMessages also updates the 'last seen' timestamp, so no need for a heartbeat for the next 25 seconds.
+    }    
+    if (updateCount++ > 3) {
+      newVersions = UpdateAvailable();
+      updateCount=0;
     }
-    // Free resources
-
-    httpb.end();
-    client.stop();  // without this, we have a small memory leak
-    newVersions = UpdateAvailable();
-    Serial.print(">>>>>> ");
-    Serial.println(newVersions);
   }
 }
 
@@ -404,19 +333,9 @@ void softReset() {
 }
 
 String UpdateAvailable(){
-  Serial.println("--- CHECK UPDATES -----");
-  String serverName = "http://" + server + "/checkUpdateForAtari.php";
-  WiFiClient client;
-  HTTPClient http;
-  http.begin(client, serverName);
-  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
   String httpRequestData = "regid=" + regID ;
-  http.POST(httpRequestData);
-  String result = "0";
-  result = http.getString();
-  result.trim();
-  http.end();
-  client.stop();
+  int httpResponseCode = 0;
+  String result = getHttpResponse("checkUpdateForAtari.php", httpRequestData, &httpResponseCode);
   String thisVersion = String(uromVersion) + " " + String(SwVersion);
   if (result != thisVersion) {   
     return result;
@@ -427,14 +346,12 @@ String UpdateAvailable(){
 void doUpdate(){
     ready_to_receive(true);
     updateProgress(1);
-     
     NetworkClient client;
     httpUpdate.onStart(update_started);
     httpUpdate.onEnd(update_finished);
     httpUpdate.onProgress(update_progress);
     httpUpdate.onError(update_error);
     httpUpdate.update(client, "http://www.chat64.nl/update/AtariXL_Chat.bin");
-    
 }
 
 void update_started() {

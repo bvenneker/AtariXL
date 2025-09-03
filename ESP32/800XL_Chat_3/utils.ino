@@ -199,18 +199,114 @@ String getValue(String data, char separator, int index) {
     r= data.substring(strIndex[0], strIndex[1]);
     // delete last character if string ends with garbage (happens on Atari)    
     int lc = r.charAt(r.length()-1);
-    if ( lc > 126  or lc < 32) {
-      Serial.println(lc);
-      Serial.println(r);
-      r.remove(r.length()-1);
-      Serial.println("REMOVED LAST CHAR");
-      Serial.println(r);
+    if ( lc > 126  or lc < 32) r.remove(r.length()-1);
+    } else r="";   
+  return r;
+}
+// ******************************************************************************
+// get one message from the big message buffer
+// ******************************************************************************
+bool getMessageFromMMBuffer(char *sourceBuffer, int *bufferIndex, bool isPrivate) {
+  // do we have any messages in the page buffer?
+  // find the first '{' in the page buffer
+  int p = 0;
+  char cc = 0;
+  bool found = false;
+  while (cc != '{' and p++ < 10) {  // find first {
+    cc = sourceBuffer[(*bufferIndex)++];
+  }
+  if (cc == '{') {  // copy to message buffer until we find '}'
+    msgbuffer[0] = cc;
+    found = true;
+    getMessage = false;
+    p = 1;
+    while (cc != '}') {
+      cc = sourceBuffer[(*bufferIndex)++];
+      if (cc != 10) msgbuffer[p++] = cc;  // put this line into the msgbuffer buffer
     }
-  } else {
-     r="";
+  }
+  if (!found) {
+    for (int y = 0; y < 3500; y++) sourceBuffer[y] = 0;  // clear the buffer
+    *bufferIndex = 0;    
   }
 
-  
+  return found;
+}
+// ******************************************************************************
+// Deserialize the json encoded messages
+// ******************************************************************************
+int Deserialize() {
+  int haveMessage = 0;
+  msgbuffersize = 0;
+  DynamicJsonDocument doc(512);                                  // next we want to analyse the json data
+  DeserializationError error = deserializeJson(doc, msgbuffer);  // deserialize the json document
+  if (!error) {    
+    unsigned long newMessageId = doc["rowid"];
+    // if we get a new message id back from the database, that means we have a new message
+    // if the database returns the same message id, there is no new message for us..
+    bool newid = false;
+    String channel = doc["channel"];
+    if ((channel == "private") and (newMessageId != messageIds[1])) {
+      newid = true;
+      tempMessageIds[1] = newMessageId;
+      String nickname = doc["nickname"];
+    }
 
-  return r;
+    if ((channel == "public") and (newMessageId != messageIds[0])) {
+      newid = true;
+      tempMessageIds[0] = newMessageId;
+    }
+    if (newid) {
+      int lines = doc["lines"];      
+      String message = doc["message"];
+      String decoded_message = ' ' + my_base64_decode(message);
+      int msize = decoded_message.length() + 1;
+      decoded_message.toCharArray(msgbuffer, msize);
+      int outputLength = decoded_message.length();
+      msgbuffersize = (int)outputLength;
+      msgbuffer[0] = lines;
+      msgbuffersize += 1;
+
+      pmCount = doc["pm"];
+      haveMessage = 1;
+      if (msgtype == "private") haveMessage = 2;
+
+    } else {  // we got the same message id back, so no new messages:
+      pmCount = doc["pm"];
+      msgbuffersize = 0;
+      haveMessage = 0;
+    }
+    doc.clear();
+  } // else {error is deserialize}
+  return haveMessage;
+}
+
+void loadPrgfile() {
+  int delayTime = 150;
+  //delay(2000);  // give the computer some time to boot
+  ch = 0;
+  ready_to_receive(true);
+  Serial.println("Waiting for start signal");
+  int i = 0;
+  while (ch != 100) {  // wait for the computer to send byte 100
+    ready_to_receive(true);
+  }
+  Serial.println("------ LOAD PRG FILE ------");
+  delayMicroseconds(delayTime);
+  sendByte(screenColor);
+  delayMicroseconds(delayTime);
+  sendByte(lowByte(sizeof(prgfile) - 6));
+  delayMicroseconds(delayTime);
+  sendByte(highByte(sizeof(prgfile) - 6));
+
+  for (int x = 6; x < sizeof(prgfile); x++) {  // Now send all the rest of the bytes
+    delayMicroseconds(delayTime);
+    sendByte(prgfile[x]);
+  }
+
+  Serial.println("------ PRG FILE DONE ------");
+  ch = 0;
+  ready_to_receive(false);
+  io2 = false;
+  dataFromHost = false;
 }

@@ -16,4 +16,7 @@ String my_base64_decode(String const& encoded_string);
 byte checksum(byte data[], int datasize);
 int x2i(char* s);
 String getValue(String data, char separator, int index);
+bool getMessageFromMMBuffer(char* sourceBuffer, int* bufferIndex, bool isPrivate);
+int Deserialize();
+void loadPrgfile();
 #endif // UTIL_H__

@@ -7,13 +7,18 @@
 
 
 // shared variables between wifi core and app core
-
+extern volatile long topMes;
+extern volatile long botMes;
+extern volatile int gotScrollMessage; 
 extern String regID;               // String variale for your regID (leave it empty!)
 extern String macaddress;          // variable for the mac address (leave it empty!)
 extern String myNickName;          // variable for your nickname (leave it empty!)
 extern String ServerConnectResult;
 extern byte ResultColor;
 extern int pmCount;               // counter for the number of unread private messages
+extern volatile int systemLineCount;
+extern volatile int pageSize;
+extern volatile int scrollDirection;
 extern String pmSender;           // name of the personal message sender
 extern String ssid; 
 extern String password;
@@ -29,7 +34,7 @@ extern char msgbuffer[500];
 extern volatile int msgbuffersize;
 extern volatile int haveMessage;
 extern volatile bool getMessage;
-extern String userPages[8];
+extern String userPages[16];
 extern String romVersion;
 extern String newVersions;
 extern char multiMessageBufferPub[3500];
@@ -41,6 +46,9 @@ extern MessageBufferHandle_t responseBuffer;
 extern bool isWifiCoreConnected;
 extern volatile bool pastMatrix;
 extern volatile bool sendingMessage;
+extern String configured;
+extern String onLineUsers; 
+extern String offLineUsers; 
 
 
 // list of wifi commands from app core to wifi core
@@ -50,8 +58,8 @@ extern volatile bool sendingMessage;
 #define GetRegistrationStatusCommand 3
 #define SendMessageToServerCommand 4
 #define GetWiFiMacAddressCommand 5
-//#define GetWiFiLocalIpCommand 6
 #define DoUpdateCommand 7
+#define ScrollUpDown 9
 
 struct WiFiCommandMessage{
     byte command;
