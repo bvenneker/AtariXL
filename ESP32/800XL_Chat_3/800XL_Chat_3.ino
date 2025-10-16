@@ -35,7 +35,7 @@ int userpageCount = 0;
 char multiMessageBufferPub[3500];
 char multiMessageBufferPriv[3500];
 unsigned long first_check = 0;
-int screenColor = 148;
+//int screenColor = 148;
 unsigned long hangup =0;
 int lastCommand =0;
 WiFiCommandMessage commandMessage;
@@ -209,7 +209,7 @@ void setup() {
   timeoffset = settings.getString("timeoffset", "+0");  // get the time offset from the eeprom
 
   screenColor = settings.getUInt("scrcolor", 148);
-  //screenColor=148;
+   
   settings.end();
 
 
@@ -353,7 +353,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // we expect a chat message from the Computer
           
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
 
           String toEncode = "[145]";
           String RecipientName = "";
@@ -457,7 +457,7 @@ void loop() {
           // 252 = Computer sends the new wifi network name (ssid) AND password AND time offset
           // ------------------------------------------------------------------------------
 
-          receive_buffer_from_host(3);
+          receive_buffer_from_host(3,true);
           // inbuffer now contains "SSID password timeoffset"
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -570,7 +570,7 @@ void loop() {
           // start byte 246 = Computer sends a new chat server ip/fqdn
           // ------------------------------------------------------------------------------
 
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
 
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -596,7 +596,7 @@ void loop() {
           // -----------------------------------------------------------------------------------------------------
           // receive the ROM version number
 
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
           char bns[inbuffersize + 1];
           // filter out any unwanted bytes, keep only ./01234567890
           for (int k = 0; k < inbuffersize; k++) {
@@ -625,7 +625,7 @@ void loop() {
           // ---------------------------------------------------------------------------------
           // this will reset all settings
 
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;
@@ -692,7 +692,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 240 = Computer sends the new registration id and nickname to ESP32
           // ------------------------------------------------------------------------------
-          receive_buffer_from_host(2);
+          receive_buffer_from_host(2,true);
           // inbuffer now contains "registrationid nickname"
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
@@ -769,7 +769,7 @@ void loop() {
           // ------------------------------------------------------------------------------
           // start byte 235 = Computer sends configuration status
           // ------------------------------------------------------------------------------
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;
@@ -806,7 +806,7 @@ void loop() {
         }
       case 231:
         {  // do the update!
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,true);
           char bns[inbuffersize + 1];
           strncpy(bns, inbuffer, inbuffersize + 1);
           String ns = bns;          
@@ -841,9 +841,13 @@ void loop() {
           // start byte 229 = Scroll Up or Down
           // ------------------------------------------------------------------------------
           static String decoded_message;
-          receive_buffer_from_host(1);
+          receive_buffer_from_host(1,false);
           if (inbuffer[0] == 0) topMes = 0;
+          Serial.print("topMes=");
+          Serial.println(topMes);
           systemLineCount = inbuffer[1];
+          Serial.print("systemLineCount=");
+          Serial.println(systemLineCount);
           pageSize = inbuffer[2];
           scrollDirection = inbuffer[3];  // 1 = up, 0 = down
           Serial.println("Scrolling starts");
@@ -853,21 +857,36 @@ void loop() {
             send_String_to_host(decoded_message);
             break;
           }
-          if (scrollBufferIndex == 0) {  // send a message to the other core to collect older messages
+          
+          if (scrollBufferIndex == 0) {  // send a message to the other core to collect older messages            
             gotScrollMessage = 0;
             commandMessage.command = ScrollUpDown;
             xMessageBufferSend(commandBuffer, &commandMessage, sizeof(commandMessage), portMAX_DELAY);
             while (gotScrollMessage == 0) delay(10);  // wait for that procedure to complete
           }
           // (more) data is in multiMessageBufferPub, collect a single message from the MMB
-          if (getMessageFromMMBuffer(multiMessageBufferPub, &scrollBufferIndex, false)) {
+          if (getMessageFromMMBuffer(multiMessageBufferPub, &scrollBufferIndex, false)) {            
             if (Deserialize() == 3) {  // decoded message is in the msgbuffer now
-              if (scrollDirection == 1) topMes = tempMessageIds[2];
+              if (scrollDirection == 1) topMes = tempMessageIds[2];              
               if (scrollDirection == 0) botMes = tempMessageIds[2];
+              Serial.print("topMes(2)=");
+              Serial.println(topMes);
               Serial.println("Wait for ACK now");
               waitAck = true;
-              decoded_message = String(msgbuffer, msgbuffersize);
-              send_buffer_to_host(msgbuffer, msgbuffersize);  // send it
+              // message is in the msgbuffer now.
+              // invert the first 40 chars.
+              for (int i=1;i<41;i++){
+                 msgbuffer[i]=msgbuffer[i]+128;
+              }
+              //msgbuffer[msgbuffersize-1]=128;
+              decoded_message = String(msgbuffer, msgbuffersize-1);
+              //Serial.println((int)decoded_message[msgbuffersize-2]);
+              //Serial.println((int)decoded_message[msgbuffersize-1]);
+              Serial.print("lines=");
+              Serial.println((int)decoded_message[0]);
+              Serial.println(decoded_message);
+              send_String_to_host(decoded_message);
+              //send_buffer_to_host(msgbuffer, msgbuffersize);  // send it
               if (scrollDirection == 1 and topMes != 0) botMes = 0;
               break;
             }
@@ -879,6 +898,7 @@ void loop() {
       case 227:
         {
           waitAck = false;
+          Serial.println("ACK!");
           break; 
         }  
       default:
@@ -925,7 +945,7 @@ void send_String_to_host(String s) {
 // ******************************************************************************
 void send_buffer_to_host(char *buffer, int buffSize) {
   int lastbyte;
-  // send the content of a buffer to the C64
+  // send the content of a buffer to the Atari
   for (int x = 0; x < buffSize - 1; x++) {
     delayMicroseconds(500);
     sendByte(buffer[x]);
@@ -950,7 +970,7 @@ void debug_print_inbuffer() {
 // ******************************************************************************
 //  void to receive characters from the host and store them in a buffer
 // ******************************************************************************
-void receive_buffer_from_host(int cnt) {
+void receive_buffer_from_host(int cnt,bool translate) {
 
   // cnt is the number of transmissions we put into this buffer
   // This number is 1 most of the time
@@ -973,7 +993,11 @@ void receive_buffer_from_host(int cnt) {
     }
     ready_to_receive(false);
     dataFromHost = false;
-    inbuffer[i] = Atari_to_Ascii(ch);
+    if (translate) 
+      inbuffer[i] = Atari_to_Ascii(ch);
+    else
+      inbuffer[i] = ch;
+
     //Serial.print(inbuffer[i]);
     i++;
     if (i > 248) {  //this should never happen

@@ -27,7 +27,7 @@ String server = "empty";  // do not change this!
 String configured = "empty";  // do not change this!
 String myLocalIp = "0.0.0.0";
 volatile unsigned long messageIds[] = { 0, 0 };
-volatile unsigned long tempMessageIds[] = { 0, 0 };
+volatile unsigned long tempMessageIds[] = { 0, 0, 0};
 volatile unsigned long lastprivmsg = 0;
 String msgtype = "public";  // do not change this!
 String users = "";          // a list of all users on this server.
@@ -75,14 +75,17 @@ String getHttpResponse(String pagename, String httpRequestData, int* httpRespons
 //   Scroll up / down routine
 // ***************************************************************
 void scrolling() {
+  Serial.println("In scrolling");
   int lm = 21 - systemLineCount;
   int httpResponseCode = 0;
   if (scrollDirection == 1 and topMes == 0) botMes = messageIds[0];  // direction 1 = up
   //if (scrollDirection==0 and botMes == 0) botMes = messageIds[0];  // direction 0 = down
-  String httpRequestData = "regid=" + regID + "&bm=" + botMes + "&tm=" + topMes + "&d=" + scrollDirection + "&p=" + pageSize + "&lm=" + lm + "&t=" + timeoffset;
+  String httpRequestData = "regid=" + regID + "&bm=" + botMes + "&tm=" + topMes + "&d=" + scrollDirection + "&system=Atari&p=" + pageSize + "&lm=" + lm + "&t=" + timeoffset;
+  Serial.println(httpRequestData);
   String result = getHttpResponse("scrollUp.php", httpRequestData, &httpResponseCode);
   if (httpResponseCode == 200) {
     msgbuffersize = result.length() + 1;
+    Serial.println(result);
     result.toCharArray(multiMessageBufferPub, msgbuffersize);
     multiMessageBufferPub[msgbuffersize] = 128;
   } else {

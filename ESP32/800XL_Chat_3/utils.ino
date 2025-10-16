@@ -1,5 +1,5 @@
 #include "utils.h"
-
+volatile int screenColor =148;
 // ******************************************************************************
 // translate Atari char set to Ascii
 // ******************************************************************************
@@ -227,7 +227,7 @@ bool getMessageFromMMBuffer(char *sourceBuffer, int *bufferIndex, bool isPrivate
   }
   if (!found) {
     for (int y = 0; y < 3500; y++) sourceBuffer[y] = 0;  // clear the buffer
-    *bufferIndex = 0;    
+    *bufferIndex = 0;   
   }
 
   return found;
@@ -240,44 +240,40 @@ int Deserialize() {
   msgbuffersize = 0;
   DynamicJsonDocument doc(512);                                  // next we want to analyse the json data
   DeserializationError error = deserializeJson(doc, msgbuffer);  // deserialize the json document
-  if (!error) {    
+  if (!error) {
     unsigned long newMessageId = doc["rowid"];
     // if we get a new message id back from the database, that means we have a new message
     // if the database returns the same message id, there is no new message for us..
-    bool newid = false;
     String channel = doc["channel"];
-    if ((channel == "private") and (newMessageId != messageIds[1])) {
-      newid = true;
-      tempMessageIds[1] = newMessageId;
-      String nickname = doc["nickname"];
-    }
+    pmCount = doc["pm"];
 
     if ((channel == "public") and (newMessageId != messageIds[0])) {
-      newid = true;
       tempMessageIds[0] = newMessageId;
-    }
-    if (newid) {
-      int lines = doc["lines"];      
-      String message = doc["message"];
-      String decoded_message = ' ' + my_base64_decode(message);
-      int msize = decoded_message.length() + 1;
-      decoded_message.toCharArray(msgbuffer, msize);
-      int outputLength = decoded_message.length();
-      msgbuffersize = (int)outputLength;
-      msgbuffer[0] = lines;
-      msgbuffersize += 1;
-
-      pmCount = doc["pm"];
       haveMessage = 1;
-      if (msgtype == "private") haveMessage = 2;
-
-    } else {  // we got the same message id back, so no new messages:
-      pmCount = doc["pm"];
-      msgbuffersize = 0;
-      haveMessage = 0;
     }
+
+    if ((channel == "private") and (newMessageId != messageIds[1])) {
+      tempMessageIds[1] = newMessageId;
+      String nickname = doc["nickname"];
+      haveMessage = 2;
+    }
+    
+    if ((channel == "scroll") and (newMessageId != topMes)){
+      tempMessageIds[2] = newMessageId;
+      haveMessage = 3;
+    }
+    
+    if (haveMessage != 0) {
+      String message = doc["message"];
+      int lines = doc["lines"];      
+      String decoded_message = char(lines) + my_base64_decode(message);
+      decoded_message.toCharArray(msgbuffer, decoded_message.length() + 1);
+      msgbuffersize = (int)decoded_message.length() + 1;                  
+    } 
+    
     doc.clear();
   } // else {error is deserialize}
+
   return haveMessage;
 }
 

@@ -2,7 +2,7 @@
 #define UTIL_H__
 
 #include "common.h"
-
+extern volatile int screenColor;
 char screenCode_to_Ascii(byte screenCode);
 char Atari_to_Ascii(byte ch);
 byte Ascii_to_screenCode(char ascii);

@@ -1389,9 +1389,6 @@ ff_end_buffer                                     //
   sta RXBUFFER,x                                  // 
   lda tempt                                       // 
   sta $14                                         // 
-//  lda #" "
-//  ldy #0
-//  sta (SCREENMEMORYPOINTER),y
   rts                                             // 
                                                   // 
 ssb_timeout                                       // 
@@ -1434,7 +1431,9 @@ wait_for_RTS2
 check_for_messages:                               // 
   lda #0                                          // reset the ATTRAC byte, https://www.atariarchives.org/mmm/page_zero.php
   sta $004D                                       // to prevent the color change after 10 minutes or so..
-  lda MENU_ID                                     // 
+  clc
+  lda SCROLLMODE                                  // do not check for messages if we are in scroll mode
+  adc MENU_ID                                     // do not check for messages if we are in a menu
   cmp #0                                          // 
   beq check_cont                                  // 
   jmp check_exit                                  // 
@@ -1612,7 +1611,6 @@ klgk
   jsr getKey                                      // 
   cmp #255                                        // 
   beq key_loop                                    // 
-                                                  // 
 cpoption                                          // 
   cmp #251                                        // ESC is pressed
   bne cp_scroll_up                                // 
@@ -1621,18 +1619,17 @@ cp_scroll_up                                      //
   cmp #139                                        // Control + u = scroll up 
   bne cp_scroll_down                              //
   jsr scroll_up                                   //
-  jmp key_loop                                    //
+  jmp cpshortloop                                        //
 cp_scroll_down                                    //
   cmp #186                                        // Control + d = scroll down  
   bne cpshortloop                                 //
   jsr scroll_down                                 //
-  jmp key_loop                                    //
+  jmp cpshortloop                                        //
 cpshortloop
-  tax // save the accumulator (the keystroke)
-  lda SCROLLMODE
-  cmp #1
-  beq klgk
-  txa // restore the accumulator
+  ldx SCROLLMODE
+  cpx #1
+  bne cpClear
+  jmp key_loop  
                                                   //
 cpClear                                           // 
   cmp #1                                          // 
@@ -1746,6 +1743,7 @@ handle_escape:
   beq esc_1
   lda #0
   sta SCROLLMODE
+  sta FIRSTDOWN
   mva #0 MCURSORX                                 // restore the cursor position
   mva #21 MCURSORY                                // restore the cursor position
   jmp restore_screen
@@ -1886,7 +1884,7 @@ su_scr1:
   lda #1
   sta SCROLLMODE
   lda #255
-  sta TIMEOUTVALUE
+  sta TIMEOUTVALUE 
   rts
 // ----------------------------------------------------------------------                                                  
 scroll_up:
@@ -1897,8 +1895,59 @@ scroll_up:
   jmp exit_su
 cont_scroll_up
   jsr setUpScrollMode
-  jsr shift_screen_down
+  jsr WAIT_FOR_RTR 
+  lda #229                                        // 
+  sta $D502                                       
+  // now send:
+  // 0 top message id
+  // 1 number of system messages
+  // 2 5 (number of messages to scroll)
+  // 3 1=up, 0=down
+  // 4 128
+  
+  jsr WAIT_FOR_RTR                                // 
+  lda FIRSTDOWN // topmessage id 
+  sta $D502      
+  lda #1
+  sta FIRSTDOWN
+  
+  jsr WAIT_FOR_RTR                                // 
+  lda #0 // number of system messages 
+  sta $D502      
+
+  jsr WAIT_FOR_RTR                                // 
+  lda #5 // number of messages to scroll (always 5) 
+  sta $D502      
+
+  jsr WAIT_FOR_RTR                                // 
+  lda #1 // 1=up, 0=down 
+  sta $D502      
+
+  jsr WAIT_FOR_RTR                                // 
+  lda #128 
+  sta $D502      
+  ldx #0
+  jsr ff_response_loop // receive the message in RXBUFFER
+  ldx RXBUFFER
+  cpx #128
+  bne shift_down_loop
   jsr sound_zipp
+  beq exit_su
+shift_down_loop  
+  txa
+  pha  
+  jsr shift_screen_down                           //
+  pla
+  tax
+  dex
+  bne shift_down_loop
+  lda #255
+  sta LENLIMIT
+  displayBuffer RXBUFFER,#0 ,#0,#1
+  jsr WAIT_FOR_RTR                                // 
+  lda #227 // acknowledge the message 
+  sta $D502     
+  jmp cont_scroll_up
 exit_su:  
   mva #255 $2fc                                   // clear keyboard buffer
   rts
@@ -2709,7 +2758,7 @@ blinkCursor:
   lda MENU_ID                                     // 
   cmp #0                                          // 
   bne exit_bc 
-
+  
   lda SCROLLMODE  
   cmp #1
   bne dblnk
@@ -2754,10 +2803,6 @@ lqd
 setphase1
   inc cursorphase
   jmp exit_bc
-  
-  //rowcrs = $54 ; cursor row 
-  //colcrs = $55 ; cursor colm ; find out where the cursor is
-  //
   
 exit_bc
   rts
