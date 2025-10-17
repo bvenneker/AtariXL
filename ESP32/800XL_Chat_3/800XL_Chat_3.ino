@@ -728,9 +728,8 @@ void loop() {
       case 239:
         {
           // ------------------------------------------------------------------------------
-          // start byte 238 = Computer asks if updated firmware is available
-          // ------------------------------------------------------------------------------
-          if (millis() < (first_check + 10000)) break;          
+          // start byte 239 = Computer asks if updated firmware is available
+          // ------------------------------------------------------------------------------                  
           send_String_to_host(newVersions);
           if (newVersions != "") urgentMessage = "New version available, press [ESC]";
           break;

@@ -1874,12 +1874,18 @@ hr_ng                                             //
 // ----------------------------------------------------------------------                                                  
 // Scroll up and down reoutines.
 // ----------------------------------------------------------------------                                                  
+drawScrollInstructions:
+  jsr clear_input_lines
+  displayText DIVIDER_LINE, #20,#0
+  displayText text_scrolling_mode, #21,#0
+  rts
+    
 setUpScrollMode:
   lda SCROLLMODE
   cmp #1
   beq su_scr1 
   jsr backup_screen
-  displayText text_scrolling_mode, #21,#0  
+  jsr drawScrollInstructions  
 su_scr1:
   lda #1
   sta SCROLLMODE
@@ -1931,6 +1937,7 @@ cont_scroll_up
   ldx RXBUFFER
   cpx #128
   bne shift_down_loop
+  jsr drawScrollInstructions
   jsr sound_zipp
   beq exit_su
 shift_down_loop  
@@ -1946,9 +1953,10 @@ shift_down_loop
   displayBuffer RXBUFFER,#0 ,#0,#1
   jsr WAIT_FOR_RTR                                // 
   lda #227 // acknowledge the message 
-  sta $D502     
+  sta $D502       
   jmp cont_scroll_up
 exit_su:  
+  
   mva #255 $2fc                                   // clear keyboard buffer
   rts
 // ----------------------------------------------------------------------
@@ -2120,7 +2128,7 @@ enddelay                                          //
   rts                                             //  
 // ----------------------------------------------------------------------
 //  Clear input lines
-// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------  
 clear_input_lines:                                // 
                                                   // fill the input lines with spaces
   mva #21 ROWCRS                                  // 
@@ -3066,8 +3074,8 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
 
   .local text_scrolling_mode                     
   .byte 'Scrolling Mode       [ ESC ] = Live Chat'
-  .byte 'Control + u = up',$9B
-  .byte 'Control + d = down'
+  .byte 'Control + u = up                        '
+  .byte 'Control + d = down                     '
   .endl
 
   .local TEXT_MADE_BY                             // 
