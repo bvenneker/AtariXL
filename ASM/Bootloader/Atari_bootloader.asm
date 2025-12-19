@@ -59,7 +59,7 @@ readRTR
   jmp resetAtari
 
 send100  
-  // Send 232 when RTR is high
+  // Send 100 when RTR is high
   lda #100
   sta $D502
 

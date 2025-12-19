@@ -124,8 +124,9 @@ void fill_userlist() {
 void get_full_userlist() {
   // this is for the user list in the menu (Who is on line?)
   // invert the online users (add 128 to the byte)
-  String input=onLineUsers;
+  String input=onLineUsers;  
   String allUsers;
+  
   for (int i = 0; i < input.length(); i++) {
      char c = input[i];
      if (c != ' ' && c != ';')  c = c + 128; // Add 128 to non-space characters

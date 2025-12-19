@@ -39,19 +39,18 @@ MESSAGEFIELD = $43                                // 43 and 44 hold a pointer to
 SPLITINDEX = $46                                  // 
                                                   // 
 CURSORINH = $2F0                                  // cursor inhibit, cursor is invisible if value is not zero
-SCREENMEMORYPOINTER = $58                         // zero page pointer to screen memory
-                                                  // 
+SAVMSC        = $0058                             // screen memory pointer (lo/hi)                                                  // 
                                                   // 
   org $2000                                       // program starts at $2000
                                                   // 
 init                                              // 
   mva #0 $52                                      // set left margin to zero
   clc                                             // we need to do some addition, so clear the carry bit first
-  lda SCREENMEMORYPOINTER                         // load the lowbyte of the pointer for screen memory
+  lda SAVMSC                                      // load the lowbyte of the pointer for screen memory
   adc #72                                         // add 72
   sta MESSAGEFIELD                                // store in $43
   clc                                             // we need to do some addition, so clear the carry bit first
-  lda SCREENMEMORYPOINTER+1                       // load the high byte
+  lda SAVMSC+1                                    // load the high byte
   adc #3                                          // add 3
   sta MESSAGEFIELD+1                              // store in $44.
   lda #0                                          // 
@@ -63,18 +62,18 @@ init                                              //
   sta restoreMessageLines                         // 
   sta MENU_ID                                     // 
   sta SCREEN_ID                                   // 
-  lda SCREENMEMORYPOINTER                         // 
+  lda SAVMSC                                      // 
   sta TEXTBOX                                     // 
-  lda SCREENMEMORYPOINTER+1                       // 
+  lda SAVMSC+1                                    // 
   sta TEXTBOX+1                                   // 
   lda #170                                        //
   sta TIMEOUTVALUE                                //
                                                   //
 create_screen_lines_lookup_table:                 // 
-  lda SCREENMEMORYPOINTER                         //  
+  lda SAVMSC                                      //  
   sta TEMP_I                                      //
   sta screenLinesLow                              //
-  lda SCREENMEMORYPOINTER +1                      //
+  lda SAVMSC+1                                    //
   sta TEMP_I +1                                   //
   sta screenLinesHigh                             //
   ldx #1                                          //
@@ -267,8 +266,8 @@ shift_screen_up:                                  //
   cmp #3                                          // in private screen, we must ignore the first 3 lines
   bne shift_public                                // 
   ldx #16                                         // 
-  mwa SCREENMEMORYPOINTER TEMP_I                  // TEMP_I points to line 0
-  mwa SCREENMEMORYPOINTER TEMP_O                  // 
+  mwa SAVMSC              TEMP_I                  // TEMP_I points to line 0
+  mwa SAVMSC              TEMP_O                  // 
   lda TEMP_I                                      // 
   adc #120                                        // 
   sta TEMP_I                                      // TEMP_I now points to line 3
@@ -279,8 +278,8 @@ shift_screen_up:                                  //
                                                   // 
 shift_public                                      // 
   ldx #19                                         // in public chat we shift from line 0
-  mwa SCREENMEMORYPOINTER TEMP_I                  // TEMP_I points to line 0
-  mwa SCREENMEMORYPOINTER TEMP_O                  // 
+  mwa SAVMSC              TEMP_I                  // TEMP_I points to line 0
+  mwa SAVMSC              TEMP_O                  // 
 shift_loop                                        // 
   clc                                             // 
   lda TEMP_O                                      // 
@@ -350,7 +349,7 @@ backup_publ_screen                                //
   rts                                             // 
                                                   // 
 backup_the_screen                                 // 
-  mwa SCREENMEMORYPOINTER TEXTPOINTER             // 
+  mwa SAVMSC              TEXTPOINTER             // 
   ldy #0                                          // 
 backup_loop1                                      // 
   lda (TEXTPOINTER),y                             // 
@@ -421,7 +420,7 @@ do_m_restore                                      //
   jmp chat_key_input                              // 
                                                   // 
 restore_the_screen                                // 
-  mwa SCREENMEMORYPOINTER TEXTPOINTER             // 
+  mwa SAVMSC              TEXTPOINTER             // 
   ldy #0                                          // 
 restore_loop1                                     // 
   lda (TEMP_I),y                                  // 
@@ -524,6 +523,8 @@ get_wifi_status_cont                              //
   jsr send_start_byte                             // the first byte in the RXBUFFER now contains 1 or 0
   lda RXBUFFER                                    // get the first byte of the RXBUFFER
   sta WIFISTATUS                                  // store the first byte as WIFISTATUS
+  lda #32
+  sta RXBUFFER
   rts                                             // 
 // ----------------------------------------------------------------------
 // Get the config status and the ESP Version
@@ -646,13 +647,15 @@ more_items                                        //
   displayText MLINE_MAIN6, #15,#3                 // 
   displayText MLINE_MAIN8, #17,#3                 // 
   displayText MLINE_MAIN7, #19,#3                 // 
+
 skip_mm1                                          // 
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
   displayText VERSION_LINE, #23,#0                // draw the version line
+
   displayBuffer SWVERSION,#23,#24,#0              // 
-  displayBuffer VERSION,#23,#14,#0                // 
+  displayBuffer VERSION,#23,#14,#0                //   
   displayBuffer VERSION_DATE #23,#32,#0           // 
-  
+
 main_menu_key_input:                              // 
   jsr getKey                                      // 
   cmp #255                                        // 
@@ -753,7 +756,7 @@ contUpdateScreen                                  //
   displayBuffer SWVERSION,#23,#24,#0              // 
   displayBuffer VERSION,#23,#14,#0                // 
                                                   // 
-updateScreenKeyInput:                             // 
+updateScreenKeyInput:                             //   
   jsr getKey                                      // 
   cmp #255                                        // 
   beq updateScreenKeyInput                        // 
@@ -776,7 +779,14 @@ exitUpdateScreen                                  //
 doUpdate                                          // 
   displayText TEXT_INSTALLING, #11,#2             // 
   displayBuffer UPDATEBOX, #13,#2,#0              // 
-                                                  // 
+  lda #$9b                                        // go to next line
+  jsr write_text                                  // 
+  lda #$1f                                        // right
+  jsr write_text                                  //                                                   
+  lda #$1f                                        // right
+  jsr write_text                                  // 
+  lda #$1f                                        // right
+  jsr write_text                                  // // 
   jsr WAIT_FOR_RTR                                // 
   lda #231                                        // 
   sta $D502                                       // 
@@ -844,7 +854,8 @@ about_screen:                                     //
   jsr clear_keyboard_and_screen                   // 
   displayText DIVIDER_LINE, #0,#0                 // draw the divider line
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
-  displayText TEXT_ABOUT_SCREEN, #1,#15           // draw the menu title and text
+  displayText TEXT_ABOUT_SCREEN, #1,#15           // draw the menu title and text  
+  displayText TEXT_ABOUT_SCREEN1, #3,#0
   displayText TEXT_ABOUT_SCREEN2, #10,#0          // draw the more text
                                                   // 
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
@@ -858,6 +869,7 @@ help_screen:                                      //
   jsr clear_keyboard_and_screen                   // 
   displayText DIVIDER_LINE, #0,#0                 // draw the divider line
   displayText TEXT_HELP_SCREEN, #1,#15            // draw the menu title and text
+  displayText TEXT_HELP_SCREEN1, #3,#0            // draw the menu title and text
   displayText TEXT_HELP_SCREEN2, #10,#0           // draw more text
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
@@ -939,6 +951,9 @@ ul_exit_main_menu                                 //
 account_setup:                                    // 
   mva #13 MENU_ID                                 // 
   jsr clear_keyboard_and_screen                   // 
+  lda #29                                         // down one line
+  jsr write_text   
+
   displayText DIVIDER_LINE, #0,#0                 // draw the divider line
   displayText TEXT_ACCOUNT_SETUP, #1,#15          // draw the menu title
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
@@ -1054,6 +1069,8 @@ server_setup:                                     //
                                                   // 
   mva #12 MENU_ID                                 // 
   jsr clear_keyboard_and_screen                   // 
+  lda #29                                         // down one line
+  jsr write_text   
   displayText DIVIDER_LINE, #0,#0                 // draw the divider line
   displayText TEXT_SERVER_SETUP, #1,#15           // draw the menu title
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
@@ -1128,11 +1145,15 @@ server_save_settings                              //
 // ----------------------------------------------------------------------
 wifi_setup:                                       // 
   mva #12 MENU_ID                                 // 
-  jsr clear_keyboard_and_screen                   // 
-  displayText DIVIDER_LINE, #0,#0                 // draw the divider line
+  jsr clear_keyboard_and_screen   
+  lda #29                                         // down one line
+  jsr write_text   
+  displayText DIVIDER_LINE, #0,#0
   displayText TEXT_WIFI_SETUP, #1,#15             // draw the menu title
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
-  displayText TEXT_WIFI_1, #5,#3                  // 
+  displayText TEXT_WIFI_SSID, #5,#3               // 
+  displayText TEXT_WIFI_PASSWORD, #7,#3
+  displayText TEXT_WIFI_OFFSET, #9,#3
   displayText DIVIDER_LINE, #11,#0                // draw the divider line
   displayText TEXT_OPTION_EXIT, #15,#3            // 
   displayText DIVIDER_LINE, #21,#0                // draw the divider line
@@ -1267,9 +1288,9 @@ exit_wait                                         //
 // set length of textbox in TEXTBOXLEN
 // ---------------------------------------------------------------------
 read_field:                                       //
-  lda SCREENMEMORYPOINTER                         // 
+  lda SAVMSC                                      // 
   sta TEXTBOX                                     // 
-  lda SCREENMEMORYPOINTER+1                       // 
+  lda SAVMSC+1                                    // 
   sta TEXTBOX+1                                   //
   jsr open_field                                  // get a pointer to the start adres of the field
   ldy #0                                          // 
@@ -1293,7 +1314,7 @@ loopr_exit                                        //
 // ---------------------------------------------------------------------
 open_field:                                       // 
   ldx TEMP_I                                      // get the row (TEMP_I holds the row number)
-sm_lineadd                                        // SCREENMEMORYPOINTER is the start of screen memory
+sm_lineadd                                        // SAVMSC is the start of screen memory
   clc                                             // clear carry
   lda TEXTBOX                                     // start at the start of screen memory
   adc #40                                         // add 40 chars (one row)
@@ -1894,7 +1915,8 @@ su_scr1:
   rts
 // ----------------------------------------------------------------------                                                  
 scroll_up:
-  // jmp exit_sd
+  
+  jmp exit_sd    // not in use for now
   lda SCREEN_ID
   cmp #3
   bne cont_scroll_up
@@ -2304,9 +2326,9 @@ cust_loop                                         //
   cpx #128                                        // 
   bne cust_loop                                   // 
   mva #>SCREEN_PUBL_BACKUP CHARSET                // set the char pointer to the new location
-  lda SCREENMEMORYPOINTER                          // create a pointer to the start of the screen
+  lda SAVMSC                                      // create a pointer to the start of the screen
   sta TEMP_I                                      // and to the end of the screen
-  lda SCREENMEMORYPOINTER+1                       // 
+  lda SAVMSC+1                                    // 
   sta TEMP_I+1                                    // 
   inc TEMP_I+1                                    // 
   inc TEMP_I+1                                    // 
@@ -2319,15 +2341,15 @@ ss2                                               //
   lda #8                                          // #85
   sta (TEMP_I),y                                  // 
   lda #9                                          // 
-  sta (SCREENMEMORYPOINTER),y                     // 
+  sta (SAVMSC),y                                  // 
   dey                                             // 
   cpy #255                                        // 
   bne ss2                                         // 
                                                   // 
-  lda SCREENMEMORYPOINTER                         // make a new pointer that points to the
+  lda SAVMSC                                      // make a new pointer that points to the
   sta TEMP_I                                      // start line of the big letters
   sta TEMP_I                                      // 
-  lda SCREENMEMORYPOINTER+1                       // 
+  lda SAVMSC+1                                    // 
   sta TEMP_I+1                                    // 
   inc TEMP_I+1                                    // 
   lda #128                                        // 
@@ -2357,7 +2379,7 @@ stars_lp                                          //
   ldy SC_STARS1,x                                 // 
   cpy #255                                        // 
   beq startupSound                                // 
-  sta (SCREENMEMORYPOINTER),y                     // 
+  sta (SAVMSC),y                                  // 
   ldy SC_STARS2,x                                 // 
   sta (TEMP_I),y                                  // 
   inx                                             // 
@@ -2394,7 +2416,7 @@ animate_stars                                     //
   pha                                             // 
   txa                                             // 
   pha                                             // 
-  mwa SCREENMEMORYPOINTER TEMP_I                  // 
+  mwa SAVMSC  TEMP_I                              // 
   jsr shift_line_to_left                          // 
   lda TEMP_I                                      // 
   adc #39                                         // 
@@ -2520,31 +2542,92 @@ shift_r_loop:                                     //
     sta (TEXTPOINTER),y                           // and store it at the first position.
     rts                                           // Now our line looks like this: HABCDEFG all characters have shifted to the right one position.
                                                   // 
-// ----------------------------------------------------------------------
-// displayBuffer, used in macro displayRXBuffer
-// ----------------------------------------------------------------------
-displayBufferk:                                   // 
-  mva #1 CURSORINH                                // 
-db_next_char                                      // 
-  ldy CHARINDEX                                   // 
-  cpy LENLIMIT                                    //
-  bcs db_exit                                     //
-  lda (TEXTPOINTER),y                             //   
-  cmp #128                                        // 
-  beq db_exit                                     // 
-write_it                                          // 
-  jsr write_text                                  // 
-  inc CHARINDEX                                   // 
-  jmp db_next_char                                // 
-db_exit                                           // 
-  lda #255                                        //
-  sta LENLIMIT                                    //
-  rts                                             // 
-                                                  // 
+;// ----------------------------------------------------------------------
+;// displayBuffer, used in macro displayRXBuffer
+;// ----------------------------------------------------------------------
+;displayBufferk:                                   // 
+;  mva #1 CURSORINH                                // 
+;db_next_char                                      // 
+;  ldy CHARINDEX                                   // 
+;  cpy LENLIMIT                                    //
+;  bcs db_exit                                     //
+;  lda (TEXTPOINTER),y                             //   
+;  cmp #128                                        // 
+;  beq db_exit                                     // 
+;write_it                                          // 
+;  jsr write_text                                  // 
+;  inc CHARINDEX                                   // 
+;  jmp db_next_char                                // 
+;db_exit                                           // 
+;  lda #255                                        //
+;  sta LENLIMIT                                    //
+;  rts                                             // 
+
+// ------------------------------------------------------
+// This routine is used in the macro displayBuffer
+// Get the length of the buffer (needed in displayTextk)
+// ------------------------------------------------------
+getBufferLength:                                  // 
+  lda #0
+  sta TEXTLEN
+  ldy CHARINDEX
+next_chat_gbl:
+  lda (TEXTPOINTER),y 
+  cmp #128
+  beq exit_gbl 
+  inc TEXTLEN
+  iny
+  jmp next_chat_gbl
+exit_gbl:  
+  rts  
+
 // ----------------------------------------------------------------------
 // displayTextk, used in macro displayText
-// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------    
+.zpvar scrptr  .word      ; reserve 2 bytes in zero page
 displayTextk:                                     // 
+  lda SAVMSC               // get screen memory base address
+  sta scrptr
+  lda SAVMSC+1
+  sta scrptr+1
+
+  ; --- add row offset (ROW * 40) ---
+  ldx ROWCRS
+  beq @skip_rows
+@rowloop:
+  clc
+  lda scrptr
+  adc #40
+  sta scrptr
+  bcc @no_carry
+  inc scrptr+1
+@no_carry:
+  dex
+  bne @rowloop
+@skip_rows:
+  ; --- add column offset ---
+  lda COLCRS
+  clc
+  adc scrptr
+  sta scrptr
+  bcc @no_carry2
+  inc scrptr+1
+@no_carry2:
+  ; --- copy text to screen ---
+  ldy #0 
+@loop:
+  cpy TEXTLEN
+  beq @done
+  lda (TEXTPOINTER),y
+  tax
+  lda chartab,x             ; translate via lookup table
+  sta (scrptr),y
+  iny
+  jmp @loop
+@done:
+        rts
+        
+displayTextk2:                                    // 
   mva #1 CURSORINH                                // 
 next_char                                         // 
   ldy CHARINDEX                                   // 
@@ -2590,7 +2673,7 @@ resetAtari:                                       //
 //----------------------------------------------------------------------
 // Hide or show the cursor
 //----------------------------------------------------------------------
-hide_cursor:                                      // 
+hide_cursor:                                      //     
   mva #1 CURSORINH                                // hide the cursor
   jmp move_cursor                                 // 
                                                   // 
@@ -2756,7 +2839,7 @@ fin_pmuser                                        //
   iny                                             // 
   lda #128                                        // 
   sta PMUSER,y                                    // 
-  rts                                               // 
+  rts                                             // 
                                                   // 
 
 // ----------------------------------------------------------------------
@@ -2819,7 +2902,7 @@ exit_bc
 // Calculate the addresses of where the messages will start
 // ----------------------------------------------------------------------
 calculate_screen_addresses:                       // 
-  mwa SCREENMEMORYPOINTER TEMP_I                  // calculate some adresses from the start of screen memory (SCREENMEMORYPOINTER)
+  mwa SAVMSC TEMP_I                               // calculate some adresses from the start of screen memory (SCREENMEMORYPOINTER)
   lda TEMP_I                                      // 
   clc                                             // 
   adc #$80                                        // 
@@ -2849,8 +2932,8 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.85',128                          // 
-VERSION_DATE .byte '07/2025',128                  // 
+VERSION .byte '3.86',128                          // 
+VERSION_DATE .byte '11/2025',128                  // 
                                                   // 
                                                   // 
                                                   // 
@@ -2917,12 +3000,13 @@ CONFIRMUPDATE: .byte "UPDATE!",128                //
 CONFIRMRESET:  .byte "RESET!",128                 // 
                                                   // 
 UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12// 
-           .byte $12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,5,$9b// 
+           .byte $12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,5 
+           .byte 32,32,32,32
            .byte $20,$20,$7c                      // 
            :32 .byte $20                          // 
-           .byte $7c,$9b,$20,$20,$1A              // 
+           .byte $7c,32,32,32,32,$20,$20,$1A              // 
            :32 .byte $12                          // 
-           .byte 3,$9b,$1f,$1f,$1f,$1c,$1c        // 
+           .byte 3 //,$9b,$1f,$1f,$1f,$1c,$1c        // 
            .byte 128                              // 
                                                   //
   .local VERSION_LINE                             // 
@@ -2959,11 +3043,13 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .byte 'WIFI SETUP'                              // 
   .endl                                           // 
                                                   // 
-  .local TEXT_WIFI_1                              // 
+  .local TEXT_WIFI_SSID                           // 
   .byte 'SSID:'                                   // 
-  .byte  $9b,$9b,'   '                            // 
+  .endl                                           // 
+  .local TEXT_WIFI_PASSWORD
   .byte 'PASSWORD:'                               // 
-  .byte  $9b,$9b,'   '                            // 
+  .endl                                           // 
+  .local TEXT_WIFI_OFFSET
   .byte 'Time Offset from GMT: +0'                // 
   .endl                                           // 
                                                   // 
@@ -2995,8 +3081,8 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
   .local TEXT_SERVER_1                            // 
-  .byte 'Server name:'                            // 
-  .byte  $9b,$9b,' '                              // 
+  .byte 'Server name:                            '// 
+  :40 .byte 32                                    // 
   .byte 'Example: www.chat64.nl'                  // 
   .endl                                           // 
                                                   // 
@@ -3005,10 +3091,10 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
   .local TEXT_ACCOUNT_1                           // 
-  .byte 'MAC Address:'                            // 
-  .byte  $9b,$9b,' '                              // 
-  .byte 'Registration ID:'                        // 
-  .byte  $9b,$9b,' '                              // 
+  .byte 'MAC Address:                            '//                                              
+  :40 .byte 32                                    //
+  .byte 'Registration ID:                        '//                                               
+  :40 .byte 32                                    //
   .byte 'Nick Name:'                              // 
   .endl                                           // 
                                                   // 
@@ -3049,26 +3135,41 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
   .local TEXT_HELP_SCREEN                         // 
-  .byte 'HELP',$9b,$9b                            // 
-  .byte 'Use Ctrl-Return to send your message immediately',$9b// 
+  .byte 'HELP'                                    // 
+  .end
+  
+  .local TEXT_HELP_SCREEN1
+        ;1234567890123456789012345678901234567890
+  .byte 'Use Ctrl-Return to send your message imm'
+  .byte 'ediately                                '// 
   .byte 'Use SELECT to switch between public and private messaging. To send a private message to someone:'// 
   .byte ' start your message with @username'      // 
                                                   // 
   .endl                                           // 
                                                   // 
   .local TEXT_HELP_SCREEN2                        // 
-  .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with'// 
+  .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with @Eliza'// 
   .endl                                           // 
                                                   // 
   .local TEXT_ABOUT_SCREEN                        // 
-  .byte 'ABOUT CHAT64',$9b,$9b                    // 
-  .byte 'Initially developed by Bart as a proof  of concept on Commodore 64',$9B,$9B// 
-  .byte 'A new version of CHAT64 is now availableto everyone.',$9B// 
-  .byte 'We proudly bring you Chat64 on Atari XL',$9B,$9B// 
-  .endl                                           // 
+  .byte 'ABOUT CHAT64' 
+  .endl
+  
+  
+  .local TEXT_ABOUT_SCREEN1
+  .byte 'Initially developed by Bart as a proof  of concept on his Commodore 64. '// 
+  :8 .byte 32
+  .byte 'A new version of CHAT64 is now availableto everyone!'// 
+  :28 .byte 32
+  .byte 'We proudly bring you Chat64 on Atari XL' // 
+  .endl                                           
+  // 
   .local TEXT_ABOUT_SCREEN2                       // 
-  .byte 'Made by Bart Venneker and Theo van den  Belt in 2024',$9B,$9B// 
-  .byte 'Hardware, software and manuals are available on Github',$9B,$9B// 
+  .byte 'Made by Bart Venneker and Theo van den  Belt in 2024'// 
+  :28 .byte 32
+  .byte 'Hardware, software and manuals are available on Github'// 
+  :28 .byte 32
+  :40 .byte 32
   .byte 'github.com/bvenneker/Chat64-Atari800'    // 
   .endl                                           // 
 
@@ -3138,31 +3239,76 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
                                                   // 
-  .local FakeChat                                 // 
-  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,180,181,186,179,183,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//                                                
-  .byte 'and how did you solve that?',$9b
-  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//  
-  .byte 'what was repaired?',$9b
-  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
-  .endl
-  .local FakeChat2
-  .byte 'The OSC additions I am making needs to add UDP protocol to the WiFi module, somehow that broke the whole unit sequence  '
-  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,177,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
-  .byte 'but its all better now',$9b
-  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,180,186,178,179,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
-  .byte 'ah... in case we need to repair',$9b
-  .endl                                           //                                                
-  .local FakeChat3
-  .byte 'ours too',$9B
-  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,176,185,186,176,177,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
-  .byte 'Hi Theo, all okay?',$9B
-  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,177,186,179,185,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
-  .byte 'Yes, I am a happy camper! my code is coming along nice',$9b
-  .endl
-  .local FakeChat4
-  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,178,186,177,183,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
-  .byte 'Oh, that was for Theo..... xD',$9b
-  .endl
+//  .local FakeChat                                 // 
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,180,181,186,179,183,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//                                                
+//  .byte 'and how did you solve that?',$9b
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160//  
+//  .byte 'what was repaired?',$9b
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,176,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
+//  .endl
+//  .local FakeChat2
+//  .byte 'The OSC additions I am making needs to add UDP protocol to the WiFi module, somehow that broke the whole unit sequence  '
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,179,186,177,176,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160// 
+//  .byte 'but its all better now',$9b
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,176,185,186,177,180,186,178,179,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
+//  .byte 'ah... in case we need to repair',$9b
+//  .endl                                           //                                                
+//  .local FakeChat3
+//  .byte 'ours too',$9B
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,176,185,186,176,177,160,207,245,244,243,239,230,244,173,216,204,160,160,160,160,160,160,160,160,160,160// 
+//  .byte 'Hi Theo, all okay?',$9B
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,177,186,179,185,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
+//  .byte 'Yes, I am a happy camper! my code is coming along nice',$9b
+//  .endl
+//  .local FakeChat4
+//  .byte 178,176,178,181,173,176,182,173,177,178,160,177,181,186,177,178,186,177,183,160,201,196,204,193,194,160,160,160,160,160,160,160,160,160,160,160,160,160,160,160//
+//  .byte 'Oh, that was for Theo..... xD',$9b
+//  .endl
+
+chartab: // 0-31 control chars
+        .byte 64,64,66,67,68,69,70,71,72,73
+        .byte 74,75,76,77,78,79,80,81,82,83
+        .byte 84,85,86,87,88,89,90,91,93,93
+        .byte 94,95
+        // 32–95: space, numbers, captitals and punctuation
+        
+        .byte        0, 1, 2, 3, 4, 5, 6, 7
+        .byte  8, 9,10,11,12,13,14,15,16,17
+        .byte 18,19,20,21,22,23,24,25,26,27
+        .byte 28,29,30,31,32,33,34,35,36,37
+        .byte 38,39,40,41,42,43,44,45,46,47
+        .byte 48,49,50,51,52,53,54,55,56,57
+        .byte 58,59,60,61,62,63
+        
+        // 96 - 127 small letters
+        .byte                   96,97,98,99
+        .byte 100,101,102,103,104,105,106,107,108,109
+        .byte 110,111,112,113,114,115,116,117,118,119
+        .byte 120,121,122,123,124,125,126,127  
+
+chartab_inverted:
+        .byte 64,64,66,67,68,69,70,71,72,73
+        .byte 74,75,76,77,78,79,80,81,82,83
+        .byte 84,85,86,87,88,89,90,91,93,93
+        .byte 94,95
+       
+        // 32–95: space, numbers, captitals and punctuation
+        
+        .byte         128,129,130,131,132,133,134,135
+        .byte 136,137,138,139,140,141,142,143,144,145
+        .byte 146,147,148,149,150,151,152,153,154,155
+        .byte 156,157,158,159,160,161,162,163,164,165
+        .byte 166,167,168,169,170,171,172,173,174,175
+        .byte 176,177,178,179,180,181,182,183,184,185
+        .byte 186,187,188,189,190,191
+        
+        // 96 - 127 small letters inverted!
+        .byte                   96,225,226,227
+        .byte 228,229,230,231,232,233,234,235,236,237
+        .byte 238,239,240,241,242,243,244,245,246,247
+        .byte 248,249,250,251,252,253,254,255 
+
+        
 // ----------------------------------------------------------------
 // Variables
 // ----------------------------------------------------------------
@@ -3180,7 +3326,7 @@ FIELD_MAX .byte 0                                 //
 FIELD_MIN .byte 0                                 // 
 VICEMODE .byte 0                                  // 
 CONFIG_STATUS .byte 0,128                         // 
-SWVERSION .byte '3.85    07/2025',128                        // 
+SWVERSION .byte '3.85    11/2025',128                        // 
 SERVERNAME .byte 'www.chat64.nl          ',128    // 
 TEMPBYTE .byte 0                                  // 
 WIFISTATUS .byte 0                                // 
@@ -3220,7 +3366,8 @@ screenLinesHigh .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
   sta TEXTPOINTER                                 // 
   lda #>(:buffer)                                 // 
   sta TEXTPOINTER+1                               // 
-  jsr displayBufferk                              // 
+  jsr getBufferLength
+  jsr displayTextk                                // 
 .endm                                             // 
                                                   // 
                                                   // 
@@ -3241,9 +3388,7 @@ screenLinesHigh .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
   sta TEXTPOINTER+1                               // 
   jsr displayTextk                                // 
 .endm                                             // 
-                                                  // 
-                                                  // 
-                                                  // 
+                                                  //  
 .align $400                                       // 
 SCREEN_PUBL_BACKUP:                               // 
                                                   // 

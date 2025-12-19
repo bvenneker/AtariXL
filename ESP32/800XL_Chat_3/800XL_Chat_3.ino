@@ -44,6 +44,7 @@ bool waitAck = false;
 int scrollBufferIndex = 0;
 int publicBufferIndex = 0;
 int privateBufferIndex =0;
+int ackResult=0;
 // ********************************
 // **        OUTPUTS             **
 // ********************************
@@ -314,7 +315,8 @@ void loop() {
     // 232 = Restart the computer (Atari only)
     // 231 = Do the update
     // 230 = Computer sends screen color (Atari Only)
-    // 228 = debug purposes
+    // 228 = NACK, Not Acknowledge message!
+    // 227 = ACK, Acknowledge message!
     // 128 = end marker, ignore
 
     switch (ch) {
@@ -336,6 +338,7 @@ void loop() {
             if (Deserialize() == 1) {              
               // deserialize returns 1 of there was a message in the buffer (2 for private message).
               translateAtariMessage();
+              //prependChecksum(outbuffer, &outbuffersize); // add a checksum to the end of the buffer
               send_buffer_to_host(outbuffer, outbuffersize);  // send it
               messageIds[0] = tempMessageIds[0];             // store the new message id;
             } else sendByte(128);                            // no more messages for now.              
@@ -894,9 +897,17 @@ void loop() {
           waitAck = false;
           break;
         } 
-      case 227:
-        {
+      case 228:
+        { // NACK, negative acknowlegde. Something went wrong, the Computer needs the same message again.
           waitAck = false;
+          ackResult=0;
+          Serial.println("NOT ACK!");
+          break; 
+        }   
+      case 227:
+        { // ACK, message was received without error. Computer is ready for the next message.
+          waitAck = false;
+          ackResult=1;
           Serial.println("ACK!");
           break; 
         }  
@@ -1146,3 +1157,21 @@ void myShiftOut(uint8_t dataPin, uint8_t clockPin, uint8_t bitOrder, uint8_t val
   }
 }
 
+// Compute -bit additive checksum and prepend it to the buffer
+void prependChecksum(char *buffer, int *bufferSize) {
+    uint8_t sum = 0;
+
+    // Compute 8-bit additive checksum
+    for (int i = 0; i < *bufferSize; i++) {
+        sum += buffer[i];  // uint8_t overflow is automatic
+    }
+
+    // Move the data forward by 1 byte to make room for checksum
+    memmove(buffer + 1, buffer, *bufferSize);
+
+    // Store checksum at the start
+    buffer[0] = sum;
+
+    // Update buffer size
+    (*bufferSize)++;
+}
