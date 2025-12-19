@@ -6,6 +6,7 @@ As of December 19 2025, this project is licensed under the Creative Commons Attr
 This project is licensed under the Creative Commons
 Attribution–NonCommercial 4.0 International License (CC BY-NC 4.0).
 
+**What this means**
 You are free to use, study, modify, and share this project for
 personal, educational, or other non-commercial purposes, provided
 that proper attribution is given.
@@ -20,5 +21,5 @@ for commercial use and may not be used without permission.
 This license applies to all hardware designs, firmware, and
 documentation in this repository unless stated otherwise.
 
-To view the full license text, see:
+**To view the full license text, see:**
 https://creativecommons.org/licenses/by-nc/4.0/
