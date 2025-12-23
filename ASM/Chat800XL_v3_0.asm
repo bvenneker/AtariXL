@@ -221,6 +221,7 @@ chat_key_input                                    //
 // shift public screen down for scrolling
 // ----------------------------------------------------------------------
 shift_screen_down:  
+  sei                                             // disable interrupts again
   ldx #18
 all_lines
   lda screenLinesLow,x
@@ -255,6 +256,7 @@ clearlp
   dey
   cpy #255
   bne clearlp 
+  cli                                             // enable interrupts again
   rts
   //   
 
@@ -262,6 +264,7 @@ clearlp
 // shift screen up
 // ----------------------------------------------------------------------
 shift_screen_up:                                  // 
+  sei
   lda SCREEN_ID                                   // see on what screen we are
   cmp #3                                          // in private screen, we must ignore the first 3 lines
   bne shift_public                                // 
@@ -311,6 +314,7 @@ shift_line_loop                                   // TEMP_I is destination
   iny                                             // 
   cpy #40                                         // 
   bne shift_line_loop                             // 
+  cli                                             // enable interrupts again
   rts                                             // 
                                                   // 
 // ----------------------------------------------------------------------
@@ -871,6 +875,8 @@ help_screen:                                      //
   displayText TEXT_HELP_SCREEN, #1,#15            // draw the menu title and text
   displayText TEXT_HELP_SCREEN1, #3,#0            // draw the menu title and text
   displayText TEXT_HELP_SCREEN2, #10,#0           // draw more text
+  displayText TEXT_HELP_SCREEN3, #14,#0           // draw more text
+
   displayText DIVIDER_LINE, #2,#0                 // draw the divider line
   displayText DIVIDER_LINE, #22,#0                // draw the divider line
   displayText MLINE_MAIN7, #23,#1                 // draw the menu on the bottom line
@@ -1915,8 +1921,6 @@ su_scr1:
   rts
 // ----------------------------------------------------------------------                                                  
 scroll_up:
-  
-  jmp exit_sd    // not in use for now
   lda SCREEN_ID
   cmp #3
   bne cont_scroll_up
@@ -1983,7 +1987,64 @@ exit_su:
   rts
 // ----------------------------------------------------------------------
 scroll_down:
-
+  lda SCREEN_ID
+  cmp #3
+  bne cont_scroll_down                            // scrolling is only allowed in public chat
+  jmp exit_su
+cont_scroll_down:
+  //jsr setUpScrollMode
+  jsr WAIT_FOR_RTR 
+  lda #229                                        // 
+  sta $D502                                       
+  // now send:
+  // 0 top message id
+  // 1 number of system messages
+  // 2 5 (number of messages to scroll)
+  // 3 1=up, 0=down
+  // 4 128
+  jsr WAIT_FOR_RTR                                // 
+  lda #1 // top message is not zero
+  sta $D502 
+  jsr WAIT_FOR_RTR                                // 
+  lda #0 // number of system messages 
+  sta $D502   
+  jsr WAIT_FOR_RTR                                // 
+  lda #5 // number of messages to scroll (always 5) 
+  sta $D502  
+  jsr WAIT_FOR_RTR                                // 
+  lda #0 // 1=up, 0=down 
+  sta $D502  
+    jsr WAIT_FOR_RTR                                // 
+  lda #128 
+  sta $D502      
+  ldx #0
+  jsr ff_response_loop                             // receive the message in RXBUFFER
+  ldx RXBUFFER                                     // first byte in buffer is the number of lines
+  stx tempt
+  cpx #128
+  bne shift_up_loop
+  jsr drawScrollInstructions
+  jsr sound_zipp
+  beq exit_sd
+shift_up_loop:
+  txa
+  pha  
+  jsr shift_screen_up                           //
+  pla
+  tax
+  dex
+  bne shift_up_loop
+  lda #255
+  sta LENLIMIT
+  sec
+  lda #20
+  sbc tempt 
+  sta tempt
+  displayBuffer RXBUFFER,tempt,#0,#1
+  jsr WAIT_FOR_RTR                                // 
+  lda #227                                        // acknowledge the message 
+  sta $D502       
+  jmp cont_scroll_down
 exit_sd:
   mva #255 $2fc                                   // clear keyboard buffer
   rts
@@ -2543,7 +2604,7 @@ shift_r_loop:                                     //
     rts                                           // Now our line looks like this: HABCDEFG all characters have shifted to the right one position.
                                                   // 
 ;// ----------------------------------------------------------------------
-;// displayBuffer, used in macro displayRXBuffer
+;// displayBufferk, used in macro displayRXBuffer
 ;// ----------------------------------------------------------------------
 ;displayBufferk:                                   // 
 ;  mva #1 CURSORINH                                // 
@@ -2570,7 +2631,7 @@ shift_r_loop:                                     //
 getBufferLength:                                  // 
   lda #0
   sta TEXTLEN
-  ldy CHARINDEX
+  ldy #0 //CHARINDEX
 next_chat_gbl:
   lda (TEXTPOINTER),y 
   cmp #128
@@ -2613,8 +2674,9 @@ displayTextk:                                     //
   bcc @no_carry2
   inc scrptr+1
 @no_carry2:
-  ; --- copy text to screen ---
-  ldy #0 
+  ; --- copy text to screen --- 
+
+  ldy #0
 @loop:
   cpy TEXTLEN
   beq @done
@@ -2932,7 +2994,7 @@ calculate_screen_addresses:                       //
 // ----------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------
-VERSION .byte '3.86',128                          // 
+VERSION .byte '3.88',128                          // 
 VERSION_DATE .byte '11/2025',128                  // 
                                                   // 
                                                   // 
@@ -3070,9 +3132,13 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .endl                                           // 
                                                   // 
   .local text_reset_screen_1                      // 
-  .byte '  This will reset your cartridge to',$9b,'  factory defaults',$9b// 
-  .byte '  you will need to go through the'  ,$9b,'  setup and registration process again',$9b,$9b// 
-  .byte '   ARE YOU SURE?  (Y/N)'                 // 
+      //'1234567890123456789012345678901234567890'
+  .byte '  This will reset your cartridge to     '//
+  .byte '  factory defaults                      '//
+  .byte '  You will need to go through the setup '//
+  .byte '  and registration process again        '// 
+  .byte '                                        '//
+  .byte '       ARE YOU SURE?  (Y/N)'             // 
   .endl                                           // 
                                                   // 
                                                   // 
@@ -3150,7 +3216,15 @@ UPDATEBOX: .byte $11,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12,$12
   .local TEXT_HELP_SCREEN2                        // 
   .byte 'To talk to Eliza (our AI Chatbot), switch to private messaging and start your message with @Eliza'// 
   .endl                                           // 
-                                                  // 
+
+  .local TEXT_HELP_SCREEN3                        
+      //'1234567890123456789012345678901234567890'// 
+  .byte 'To scroll up and down:                  ' 
+  .byte '  press CONTROL + U for up              '// 
+  .byte '  press CONTROL + D for down            '  
+  .endl                                           // 
+  
+  // 
   .local TEXT_ABOUT_SCREEN                        // 
   .byte 'ABOUT CHAT64' 
   .endl
@@ -3366,6 +3440,13 @@ screenLinesHigh .byte 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
   sta TEXTPOINTER                                 // 
   lda #>(:buffer)                                 // 
   sta TEXTPOINTER+1                               // 
+  clc                                             // add offset to TEXTPOINTER (16-bit)
+  lda TEXTPOINTER
+  adc :offset
+  sta TEXTPOINTER
+  lda TEXTPOINTER+1
+  adc #0
+  sta TEXTPOINTER+1
   jsr getBufferLength
   jsr displayTextk                                // 
 .endm                                             // 

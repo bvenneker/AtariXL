@@ -1030,12 +1030,12 @@ void receive_buffer_from_host(int cnt,bool translate) {
   inbuffersize = i;
 }
 
-
 // ******************************************************************************
 // send a single byte to the Host
 // ******************************************************************************
 bool sendByte(byte b) {
   bool result=true;
+
   outByte(b);
   io2 = false;
   ready_to_send(true);
@@ -1103,19 +1103,23 @@ void translateAtariMessage() {
   }
 }
 
-void ready_to_receive(bool b) {
-  if (b)
-    digitalWrite(RTR, HIGH);
-  else
+void ready_to_receive(bool b) {  
+  if (b) {
+    digitalWrite(RTR, HIGH);    
+  }
+  else {
     digitalWrite(RTR, LOW);
+  }
   return;
 }
 
 void ready_to_send(bool b) {
-  if (b)
+  if (b){
     digitalWrite(RTS, HIGH);
-  else
+  }
+  else {
     digitalWrite(RTS, LOW);
+  }
   return;
 }
 

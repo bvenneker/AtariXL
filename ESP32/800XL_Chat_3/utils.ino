@@ -281,8 +281,10 @@ void loadPrgfile() {
   int delayTime = 150;
   //delay(2000);  // give the computer some time to boot
   ch = 0;
-  ready_to_receive(true);
+  Serial.println("Atari version.");
   Serial.println("Waiting for start signal");
+  ready_to_receive(true);
+  
   int i = 0;
   while (ch != 100) {  // wait for the computer to send byte 100
     ready_to_receive(true);
