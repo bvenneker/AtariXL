@@ -422,7 +422,7 @@ void loop() {
           char buff[buflen];
           toEncode.toCharArray(buff, buflen);
           String Encoded = my_base64_encode(buff, buflen);
-
+          Encoded = urlEncode(Encoded);
           // Now send it with retry!
           bool sc = false;
           int retry = 0;
@@ -1178,4 +1178,21 @@ void prependChecksum(char *buffer, int *bufferSize) {
 
     // Update buffer size
     (*bufferSize)++;
+}
+
+String urlEncode(const String &s)
+{
+    String out;
+    char hex[4];
+
+    for (size_t i = 0; i < s.length(); i++) {
+        char c = s[i];
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += c;
+        } else {
+            sprintf(hex, "%%%02X", (unsigned char)c);
+            out += hex;
+        }
+    }
+    return out;
 }
